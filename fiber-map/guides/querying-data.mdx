@@ -1,0 +1,66 @@
+---
+title: "Query Examples"
+description: "Common query patterns for Fiber Map data"
+icon: "code"
+---
+
+## Time Series Analysis
+
+### Growth Over Time
+
+```sql
+SELECT 
+    TIME_PERIOD_DATE,
+    COUNT(DISTINCT LOCATION_ID) AS TOTAL_LOCATIONS
+FROM usa_location_summary
+WHERE TECHNOLOGY_NAME = 'Fiber to the Premises'
+GROUP BY TIME_PERIOD_DATE
+ORDER BY TIME_PERIOD_DATE;
+```
+
+## Provider Analysis
+
+### Market Share
+
+```sql
+SELECT 
+    BRAND_NAME,
+    COUNT(DISTINCT LOCATION_ID) AS LOCATIONS,
+    ROUND(COUNT(DISTINCT LOCATION_ID) * 100.0 / 
+        SUM(COUNT(DISTINCT LOCATION_ID)) OVER (), 2) AS MARKET_SHARE_PCT
+FROM usa_location_summary
+WHERE TIME_PERIOD = 'June 2023'
+    AND TECHNOLOGY_NAME != 'All'
+GROUP BY BRAND_NAME
+ORDER BY LOCATIONS DESC;
+```
+
+## Technology Analysis
+
+### Technology Distribution
+
+```sql
+SELECT 
+    TECHNOLOGY_NAME,
+    COUNT(DISTINCT LOCATION_ID) AS LOCATIONS
+FROM usa_location_summary
+WHERE TIME_PERIOD = 'June 2023'
+    AND TECHNOLOGY_NAME != 'All'
+GROUP BY TECHNOLOGY_NAME
+ORDER BY LOCATIONS DESC;
+```
+
+## Speed Analysis
+
+### Average Speeds by Technology
+
+```sql
+SELECT 
+    TECHNOLOGY_NAME,
+    ROUND(AVG(MAX_ADVERTISED_DOWNLOAD_SPEED), 0) AS AVG_DOWNLOAD_MBPS,
+    ROUND(AVG(MAX_ADVERTISED_UPLOAD_SPEED), 0) AS AVG_UPLOAD_MBPS
+FROM usa_all_periods_final
+WHERE TIME_PERIOD = 'June 2023'
+GROUP BY TECHNOLOGY_NAME
+ORDER BY AVG_DOWNLOAD_MBPS DESC;
+```

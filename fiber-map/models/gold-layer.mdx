@@ -1,0 +1,54 @@
+---
+title: "GOLD Layer Details"
+description: "Detailed schema for GOLD layer models"
+icon: "layer-group"
+---
+
+## usa_all_periods_final
+
+**Schema**: `FIBER_MAP.DBT_GOLD.usa_all_periods_final`
+
+### Key Derived Fields
+
+**TECHNOLOGY_NAME**: Maps numeric codes to readable names
+```sql
+CASE 
+    WHEN TECHNOLOGY = 40 THEN 'Cable'
+    WHEN TECHNOLOGY = 50 THEN 'Fiber to the Premises'
+    -- etc.
+END
+```
+
+**BUILD_DATE**: First appearance of service at location
+```sql
+MIN(TO_DATE(TIME_PERIOD, 'MMMM YYYY')) OVER (
+    PARTITION BY LOCATION_ID, BRAND_NAME, TECHNOLOGY
+)
+```
+
+**DOCSIS_CLASS**: Cable generation based on speeds
+```sql
+CASE 
+    WHEN DOWNLOAD > 1000 AND UPLOAD > 1000 THEN '4.0'
+    WHEN DOWNLOAD > 800 THEN '3.1'
+    ELSE '2.0/3.0'
+END
+```
+
+---
+
+## usa_location_summary
+
+**Schema**: `FIBER_MAP.DBT_GOLD.usa_location_summary`
+
+### Structure
+
+Deduplicated distinct records by:
+- TIME_PERIOD
+- BRAND_NAME
+- TECHNOLOGY_NAME
+- LOCATION_ID
+
+### Synthetic "All" Rows
+
+Includes additional rows with `TECHNOLOGY_NAME = 'All'` to support parameter filtering in BI tools without double-counting locations.

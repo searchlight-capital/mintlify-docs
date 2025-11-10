@@ -1,0 +1,42 @@
+---
+title: "Data Models"
+description: "Available data models in Fiber Map"
+icon: "table"
+---
+
+## GOLD Layer Models
+
+### usa_all_periods_final
+
+**Table**: `FIBER_MAP.DBT_GOLD.usa_all_periods_final`
+
+Complete time-series dataset with location-level detail for Indiana.
+
+**Key Fields**:
+- `PRIMARY_KEY`: MD5 composite key
+- `LOCATION_ID`: Location identifier
+- `TIME_PERIOD_DATE`: Parsed date field
+- `TECHNOLOGY_NAME`: Human-readable technology name
+- `BUILD_DATE`: First date service appeared
+- `DOCSIS_CLASS`: Cable technology generation ('2.0/3.0', '3.1', '4.0')
+- Speed fields and provider information
+
+**Use for**: Detailed analysis, speed analysis, trend tracking
+
+### usa_location_summary
+
+**Table**: `FIBER_MAP.DBT_GOLD.usa_location_summary`
+
+Aggregated summary by location, time, brand, and technology.
+
+**Key Fields**:
+- `PRIMARY_KEY`: MD5 composite key
+- `LOCATION_ID`: Location identifier
+- `TIME_PERIOD_DATE`: Parsed date field
+- `TECHNOLOGY_NAME`: Technology name (includes synthetic "All" rows)
+
+**Use for**: Coverage analysis, provider counts, simple reporting
+
+<Note>
+  `usa_location_summary` includes synthetic rows where `TECHNOLOGY_NAME = 'All'` for BI tool filtering. Exclude these with `WHERE TECHNOLOGY_NAME != 'All'` when needed.
+</Note>

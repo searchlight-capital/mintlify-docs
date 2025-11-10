@@ -1,0 +1,35 @@
+---
+title: "Data Sources"
+description: "Source data for Fiber Map"
+icon: "database"
+---
+
+## Primary Source
+
+**Table**: `FIBER_MAP.CLEAN.USA_ALL_PERIODS_FINAL`
+
+Broadband availability data by location, provider, technology, and time period.
+
+## Key Fields
+
+- `LOCATION_ID`: Unique location identifier
+- `STATE`: State name (currently filtered to "INDIANA")
+- `BRAND_NAME`: ISP brand name
+- `FRN`: Provider FCC Registration Number
+- `TECHNOLOGY`: Technology code (10=Copper, 40=Cable, 50=Fiber, 60/61=Satellite, 70/71/72=Wireless)
+- `TIME_PERIOD`: Reporting period (e.g., "June 2023")
+- `MAX_ADVERTISED_DOWNLOAD_SPEED`: Download speed in Mbps
+- `MAX_ADVERTISED_UPLOAD_SPEED`: Upload speed in Mbps
+
+## Technology Codes
+
+| Code | Technology |
+|------|------------|
+| 10 | Copper (DSL) |
+| 40 | Cable (DOCSIS) |
+| 50 | Fiber to the Premises |
+| 60 | GSO Satellite |
+| 61 | NGSO Satellite |
+| 70 | Unlicensed Fixed Wireless |
+| 71 | Licensed Fixed Wireless |
+| 72 | Low-Band Radio Fixed Wireless |

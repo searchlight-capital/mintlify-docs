@@ -1,0 +1,50 @@
+---
+title: "Getting Started"
+description: "How to access Fiber Map data"
+icon: "rocket"
+---
+
+## Access Requirements
+
+- Snowflake account with access to `FIBER_MAP` database
+- Appropriate permissions on `DBT_GOLD` schema
+
+## Quick Start
+
+### Connect to Snowflake
+
+```sql
+USE DATABASE FIBER_MAP;
+USE SCHEMA DBT_GOLD;
+```
+
+### Verify Access
+
+```sql
+SELECT 
+    COUNT(*) AS TOTAL_RECORDS,
+    COUNT(DISTINCT LOCATION_ID) AS UNIQUE_LOCATIONS,
+    MIN(TIME_PERIOD_DATE) AS EARLIEST_DATE,
+    MAX(TIME_PERIOD_DATE) AS LATEST_DATE
+FROM usa_all_periods_final;
+```
+
+### Basic Query Example
+
+```sql
+SELECT 
+    TECHNOLOGY_NAME,
+    COUNT(DISTINCT LOCATION_ID) AS LOCATIONS
+FROM usa_location_summary
+WHERE TIME_PERIOD = 'June 2023'
+    AND TECHNOLOGY_NAME != 'All'
+GROUP BY TECHNOLOGY_NAME
+ORDER BY LOCATIONS DESC;
+```
+
+## Important Notes
+
+- Always use `DISTINCT` when counting locations
+- Filter synthetic "All" rows: `WHERE TECHNOLOGY_NAME != 'All'`
+- Use `TIME_PERIOD_DATE` for date filtering
+- No assumed referential integrity - use LEFT JOINs
