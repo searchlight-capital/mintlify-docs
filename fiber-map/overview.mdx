@@ -10,7 +10,7 @@ The Fiber Map dataset provides comprehensive broadband availability data sourced
 
 ### Coverage
 
-- **Data Size**: 2.5+ billion location records across multiple time periods
+- **Data Size**: 122.8 million unique locations, 2.5+ billion records across multiple time periods
 - **Geographic Scope**: US-wide data collection
 - **Current Focus**: Indiana (Gold layer contains 2% sample filtered to Indiana)
 - **Time Range**: June 2022 through December 2024
@@ -38,22 +38,13 @@ The Fiber Map dataset enables several critical business analyses:
   </Card>
 </CardGroup>
 
-## Who Should Use This Data?
-
-This dataset is designed for:
-
-- **Business Analysts**: Market sizing, competitive analysis, and trend reporting
-- **Data Engineers**: Pipeline development and data integration
-- **Executives**: Strategic planning and investment decisions
-- **Strategy Teams**: Market entry evaluation and partnership opportunities
-
 ## Quick Start
 
 ### Access the Data in Lightdash
 
 The fastest way to start analyzing Fiber Map data is through **Lightdash**, our interactive analytics platform:
 
-<Card title="Lightdash Dashboard" icon="chart-mixed" href="#">
+<Card title="Lightdash Dashboard" icon="chart-mixed" href="https://app.lightdash.cloud/projects/03c318bf-2fdf-4cfa-9929-7181b74c06c4/dashboards/37f04ac3-e7ed-42db-ac5f-7ff715a90f40/view">
   Access pre-built visualizations and interactive analysis tools
 </Card>
 
@@ -63,43 +54,7 @@ Lightdash provides:
 - Export capabilities for further analysis
 - No SQL knowledge required
 
-### Query Directly in Snowflake
-
-For advanced users who need direct database access:
-
-**Database**: `FIBER_MAP`  
-**Primary Tables**:
-- `DBT_GOLD.USA_ALL_PERIODS_FINAL` - Detailed location-level data
-- `DBT_GOLD.USA_LOCATION_SUMMARY` - Aggregated summary view
-
-<Note>
-For most analytical queries, use **Lightdash** instead of writing SQL directly. Lightdash provides pre-built metrics, interactive filtering, and visualizations without requiring SQL knowledge.
-</Note>
-
 ## Understanding the Data
-
-### Core Concepts
-
-**Location ID**: The fundamental grain of the data. Each `LOCATION_ID` represents a unique broadband service location (typically a building or address).
-
-**Technology Codes**: Broadband services are classified by technology type (Fiber, Cable, Fixed Wireless, Satellite, Copper/DSL).
-
-**Time Periods**: Data is captured semi-annually and labeled by month/year (e.g., "June 2023", "December 2023").
-
-**Business vs. Residential**: Services are tagged with codes indicating availability to business customers (B), residential customers (R), or both (X).
-
-### Data Layers
-
-The Fiber Map project follows a four-layer architecture:
-
-1. **CLEAN**: Raw data from FCC reporting (source of truth)
-2. **STAGE**: Standardized column names and data types (not typically used by analysts)
-3. **MODEL**: Normalized business entities with analytical fields (not typically used by analysts)
-4. **GOLD**: Analysis-ready datasets optimized for business use ← **Start here!**
-
-<Tip>
-**For most analysis needs, start with the GOLD layer tables.** These are specifically designed for business users and include all necessary fields with clear, readable names.
-</Tip>
 
 ## Data Quality & Reliability
 
@@ -114,23 +69,5 @@ This data comes from **provider self-reporting to the FCC**, which means:
 Always interpret this data as "claimed service availability" rather than guaranteed service. Actual service availability at specific addresses may differ.
 </Warning>
 
-## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Data Model & Structure" icon="diagram-project" href="/fiber-map/data-model">
-    Understand table relationships and structure
-  </Card>
-  
-  <Card title="Key Metrics" icon="calculator" href="/fiber-map/key-metrics">
-    Learn about the core metrics and how to use them
-  </Card>
-  
-  <Card title="Data Dictionary" icon="book" href="/fiber-map/data-dictionary/overview">
-    Browse available tables and fields
-  </Card>
-  
-  <Card title="Calculations & Logic" icon="function" href="/fiber-map/calculations">
-    Understand how fields are calculated
-  </Card>
-</CardGroup>
 

@@ -25,12 +25,6 @@ This is the fundamental metric for market sizing and coverage analysis. It answe
 - What's the size of the addressable market in County Y?
 - How many locations have fiber service available?
 
-**Common Uses in Lightdash**
-
-- **Provider Footprint Comparison**: Group by `BRAND_NAME`, filter by `TIME_PERIOD`
-- **Technology Adoption**: Group by `TECHNOLOGY_NAME`, filter by `TIME_PERIOD`
-- **Market Penetration Over Time**: Group by `TIME_PERIOD` and `BRAND_NAME`, add as time series
-
 **Important Notes**
 
 <Warning>
@@ -45,76 +39,4 @@ Always use `COUNT(DISTINCT LOCATION_ID)` rather than `COUNT(*)` when counting lo
 
 **Calculation**: `(Location count / Total locations) * 100`
 
-**Business Context**
-
-This metric provides market share and competitive positioning insights. It answers questions like:
-- What percentage of the market does Provider X serve?
-- What's the fiber adoption rate in the region?
-- How does my market share compare to competitors?
-
-**Common Uses in Lightdash**
-
-- **Provider Market Share**: Group by `BRAND_NAME`, use `PERCENT_OF_LOCATIONS` metric
-- **Technology Mix**: Group by `TECHNOLOGY_NAME`, use `PERCENT_OF_LOCATIONS` metric  
-- **Competitive Analysis**: Filter by multiple providers, compare percentages across dimensions
-
-## Using Metrics in Lightdash
-
-In Lightdash, these metrics are pre-configured and available in the metrics panel:
-
-1. **Select your table**: Choose `usa_all_periods_final` or `usa_location_summary`
-2. **Add metrics**: Drag `NUMBER_OF_LOCATIONS` or `PERCENT_OF_LOCATIONS` to your visualization
-3. **Add dimensions**: Break down by `BRAND_NAME`, `TECHNOLOGY_NAME`, `TIME_PERIOD`, etc.
-4. **Apply filters**: Filter by time period, geography, or other attributes
-
-The metrics will automatically calculate correctly based on your filters and groupings.
-
-## Common Filtering Patterns in Lightdash
-
-- **Filter by Time Period**: Always filter to a specific `TIME_PERIOD` to avoid double-counting
-- **Filter by Technology**: Select specific values from `TECHNOLOGY_NAME` dimension
-- **Filter by Geography**: Use `STATE`, `COUNTY`, or `ZCTA` filters
-- **Exclude Synthetic Rows**: When using `usa_location_summary`, exclude `TECHNOLOGY_NAME = 'All'`
-
-## Calculations vs. Dimensions
-
-Understanding the difference helps you use the data correctly:
-
-**Metrics (Calculations)**
-- Aggregate measures like counts, averages, percentages
-- Examples: `NUMBER_OF_LOCATIONS`, `PERCENT_OF_LOCATIONS`
-- Calculated across multiple rows
-- Displayed in the "Metrics" section of Lightdash
-
-**Dimensions (Attributes)**
-- Descriptive fields used for grouping and filtering
-- Examples: `BRAND_NAME`, `TECHNOLOGY_NAME`, `TIME_PERIOD`, `COUNTY`
-- Direct values from the table
-- Displayed in the "Dimensions" section of Lightdash
-
-<Tip>
-When building analysis, start by selecting your dimensions (what you want to group by), then add metrics (what you want to measure).
-</Tip>
-
-## Advanced Analysis in Lightdash
-
-### Weighted Averages
-
-Use average speed dimensions grouped by provider and technology to see typical speeds offered.
-
-### Period-over-Period Growth
-
-Use Lightdash's table calculation features to compare metrics across different `TIME_PERIOD` values.
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card title="Data Dictionary" icon="book" href="/fiber-map/data-dictionary/overview">
-    Explore all available dimensions for filtering and grouping
-  </Card>
-  
-  <Card title="Calculations & Logic" icon="function" href="/fiber-map/calculations">
-    Understand how derived fields are calculated
-  </Card>
-</CardGroup>
 

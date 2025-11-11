@@ -1,0 +1,220 @@
+---
+title: "Frequently Asked Questions"
+description: "Common questions and troubleshooting guidance for the Fiber Map dataset"
+icon: "circle-question"
+---
+
+## Frequently Asked Questions
+
+### General Questions
+
+<AccordionGroup>
+  <Accordion title="Why do some locations show multiple providers?" icon="circle-question">
+    **Answer**: This is normal and expected! One location can be served by multiple broadband providers using different technologies.
+    
+    For example, a single address might have:
+    - Comcast (Cable)
+    - AT&T (Fiber)
+    - T-Mobile (Fixed Wireless)
+    - Starlink (Satellite)
+    
+    This is captured in the dataset by having multiple rows per location, each representing a different provider-technology combination.
+    
+    **Analysis tip**: To count locations (not provider-location combinations), always use `COUNT(DISTINCT LOCATION_ID)`.
+  </Accordion>
+  
+  <Accordion title="What's the difference between Business and Residential service?" icon="building">
+    **Answer**: The BUSINESS_RESIDENTIAL_CODE field indicates service availability:
+    
+    - **R** = Residential customers only (home internet)
+    - **B** = Business customers only (commercial service)
+    - **X** = Both business and residential customers
+    
+    **Key differences**:
+    - **Residential**: Consumer-grade service, residential pricing, best-effort SLA
+    - **Business**: Commercial-grade service, SLAs, dedicated support, higher pricing
+    
+    Many providers offer the same technology to both markets but differentiate by service level and pricing.
+    
+    **Analysis tip**: To include residential service, filter to `BUSINESS_RESIDENTIAL_CODE IN ('R', 'X')`.
+  </Accordion>
+  
+  <Accordion title="How often is the data updated?" icon="calendar-days">
+    **Answer**: The FCC collects broadband data **semi-annually**:
+    
+    - **June reporting period**: Data released in July-August
+    - **December reporting period**: Data released in January-February
+    
+    The Gold layer is refreshed within 1-2 weeks of each FCC data release.
+    
+    **Implication**: Changes that occur between reporting periods are not captured. If a provider expands in March, it won't appear until the June reporting period (released in July-August).
+  </Accordion>
+  
+  <Accordion title="Why is only Indiana in the Gold layer?" icon="map">
+    **Answer**: The Gold layer currently contains a 2% sample filtered to Indiana to optimize query performance and focus on an initial target market.
+    
+    **For Indiana analysis**: Use Gold layer (fast, optimized)
+    **For national analysis**: Use Clean layer (`FIBER_MAP.CLEAN.USA_ALL_PERIODS_FINAL`)
+    
+    The full national dataset is available in the Clean layer with all 50 states and 2.5 billion records.
+    
+    **Future plans**: Additional geographies may be added to Gold layer based on business needs.
+  </Accordion>
+  
+  <Accordion title="Can I trust the speed information?" icon="gauge-high">
+    **Answer**: Speed information should be interpreted as "maximum advertised speeds," not guaranteed performance.
+    
+    **What speeds represent**:
+    - Provider's claimed maximum speed capability
+    - "Up to" speeds, not minimums or averages
+    - Theoretical maximum under ideal conditions
+    - No verification or testing performed
+    
+    **What speeds do NOT represent**:
+    - Actual customer experience
+    - Average speeds
+    - Guaranteed minimums
+    - Speed during peak usage times
+    
+    **Use cases**:
+    - Compare relative speed offerings between providers
+    - Identify gigabit-capable infrastructure
+    - Track speed increases over time
+    - Classify service tiers
+    
+    **Don't use for**: Actual performance validation or customer QoS analysis
+  </Accordion>
+</AccordionGroup>
+
+### Data Analysis Questions
+
+<AccordionGroup>
+  <Accordion title="How do I count unique locations correctly?" icon="hashtag">
+    **Answer**: Use the pre-configured `NUMBER_OF_LOCATIONS` metric in Lightdash, which automatically counts distinct locations.
+    
+    **Why**: One location appears in multiple rows due to different providers, technologies, time periods, and service types. The metric handles this correctly.
+    
+    **In Lightdash**: Simply add the `NUMBER_OF_LOCATIONS` metric to your query and group by the dimensions you need (e.g., `BRAND_NAME`, `TECHNOLOGY_NAME`).
+  </Accordion>
+  
+  <Accordion title="Should I use usa_all_periods_final or usa_location_summary?" icon="table">
+    **Answer**: Depends on what you need:
+    
+    **Use usa_all_periods_final when you need**:
+    - Speed information (download/upload Mbps)
+    - DOCSIS classification
+    - Business vs. residential breakdown
+    - Census block detail
+    - Build dates
+    
+    **Use usa_location_summary when you need**:
+    - Simple location counts
+    - Market share calculations
+    - Faster query performance
+    - Lightdash dashboards
+    - Provider footprint analysis
+    
+    **Rule of thumb**: If you only need to count locations by provider/technology/time, use the summary table. If you need detailed attributes, use the detail table.
+  </Accordion>
+  
+  <Accordion title="What are the 'All' technology rows in usa_location_summary?" icon="layer-group">
+    **Answer**: These are **synthetic rows** added to support Lightdash parameter filtering.
+    
+    For each location + brand + time period, the table includes:
+    - One row for each actual technology (Cable, Fiber, etc.)
+    - One synthetic row with TECHNOLOGY_NAME = 'All'
+    
+    **Purpose**: Enables Lightdash users to filter by "All Technologies" without creating duplicate counts.
+    
+    **Important**: When you need actual technology breakdowns in Lightdash, filter out `TECHNOLOGY_NAME = 'All'` in your query filters.
+    
+    **When to keep them**: When you want to see aggregated metrics across all technologies.
+  </Accordion>
+  
+  <Accordion title="How do I calculate market share?" icon="chart-pie">
+    **Answer**: Use the `PERCENT_OF_LOCATIONS` metric in Lightdash.
+    
+    **In Lightdash**:
+    1. Add the `PERCENT_OF_LOCATIONS` metric
+    2. Group by `BRAND_NAME`
+    3. Filter to your desired `TIME_PERIOD`
+    
+    **Note**: Market share percentages will sum to more than 100% because locations can have multiple providers.
+  </Accordion>
+  
+  <Accordion title="How do I analyze trends over time?" icon="chart-line">
+    **Answer**: Use Lightdash's time-series visualization features with the `TIME_PERIOD_DATE` dimension.
+    
+    **In Lightdash**:
+    1. Add `NUMBER_OF_LOCATIONS` metric
+    2. Group by `TIME_PERIOD_DATE` and `BRAND_NAME`
+    3. Filter to specific providers you want to compare
+    4. Visualize as a line chart
+    
+    **Tips**:
+    - Use `TIME_PERIOD_DATE` for time-series charts
+    - Use `TIME_PERIOD` for readable labels in tables
+    - Remember data is semi-annual, so expect 6-month gaps between points
+  </Accordion>
+  
+  <Accordion title="The Gold layer shows small numbers. Is this correct?" icon="chart-line-down">
+    **Answer**: Yes! The Gold layer contains a **2% sample** of Indiana locations.
+    
+    **To estimate full Indiana counts**: Multiply the `NUMBER_OF_LOCATIONS` metric by 50.
+    
+    **In Lightdash**: Use table calculations to create a new field that multiplies `NUMBER_OF_LOCATIONS * 50` for estimated full counts.
+    
+    **For precise counts**: Contact the data team for access to the Clean layer (advanced users only).
+  </Accordion>
+</AccordionGroup>
+
+### Technical Questions
+
+<AccordionGroup>
+  <Accordion title="Why are some DOCSIS_CLASS values NULL?" icon="signal-stream">
+    **Answer**: DOCSIS_CLASS only applies to Cable technology (TECHNOLOGY = 40).
+    
+    For all other technologies (Fiber, Fixed Wireless, Satellite, Copper), DOCSIS_CLASS is NULL because DOCSIS is specific to cable infrastructure.
+    
+    **This is correct and expected**. Only filter or group by DOCSIS_CLASS when analyzing cable providers.
+    
+    **In Lightdash**: Filter to `TECHNOLOGY_NAME = 'Cable'` first, then group by `DOCSIS_CLASS`.
+  </Accordion>
+  
+  <Accordion title="What does BUILD_DATE represent?" icon="calendar-check">
+    **Answer**: BUILD_DATE is the **first date that provider-technology combination appeared in the FCC dataset**, not necessarily the actual construction date.
+    
+    **What it means**:
+    - First reporting period where provider claimed to serve that location with that technology
+    - "First observed" date in the data
+    - Earliest period tracked (June 2022)
+    
+    **What it does NOT mean**:
+    - Actual infrastructure construction date
+    - Service activation date
+    - Customer connection date
+    
+    **Use for**:
+    - Tracking provider expansion patterns
+    - Identifying recently entered markets
+    - Analyzing build-out timelines
+    
+    **Limitation**: Data collection started June 2022, so no BUILD_DATE can be earlier than 2022-06-01.
+  </Accordion>
+  
+  <Accordion title="Can I join Gold tables to external data?" icon="link">
+    **Answer**: Yes, using geographic identifiers.
+    
+    **Join keys available**:
+    - **STATE**: State name ("INDIANA")
+    - **COUNTY**: County name ("Marion")
+    - **ZCTA**: ZIP Code Tabulation Area (5-digit string)
+    - **BLOCK_GEOID**: Census block identifier (15-digit string)
+    
+    **In Lightdash**: Use these geographic dimensions to filter and group data. For external data joins, work with your data team to create joined datasets.
+    
+    **Note**: When joining tables, use LEFT JOIN patterns to handle potential mismatches in geographic naming conventions.
+  </Accordion>
+</AccordionGroup>
+
+

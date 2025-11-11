@@ -8,55 +8,6 @@ icon: "diagram-project"
 
 The Fiber Map dataset originates from the **Federal Communications Commission (FCC)** broadband availability reporting program, where internet service providers submit semi-annual reports detailing their service coverage across the United States.
 
-### Dataset Size & Scope
-
-- **Original Raw Data**: 5.2 billion records
-- **Clean Layer**: 2.5 billion records (deduplicated and standardized)
-- **Gold Layer (Current)**: 2% sample filtered to Indiana for optimized analysis
-- **Geographic Coverage**: US-wide data collection, currently filtered to Indiana in analysis tables
-- **Time Periods**: June 2022, December 2022, June 2023, December 2023, June 2024, December 2024
-
-## Key Concepts
-
-### Location ID - The Data Grain
-
-The fundamental unit of analysis is the **`LOCATION_ID`**. Each location ID represents a unique broadband service location, typically corresponding to a building or serviceable address.
-
-<Note>
-One location can have multiple records because:
-- Multiple providers may serve the same location
-- A single provider may offer multiple technology types at one location
-- Services are tracked across multiple time periods
-- Business and residential services are recorded separately
-</Note>
-
-### Technology Codes
-
-Services are classified by the technology used to deliver broadband:
-
-| Code | Technology | Description |
-|------|------------|-------------|
-| 10 | Copper (DSL) | Traditional phone line-based internet |
-| 40 | Cable | Cable TV infrastructure (DOCSIS) |
-| 50 | Fiber to the Premises | Direct fiber optic connection |
-| 60 | GSO Satellite | Geostationary orbit satellite |
-| 61 | NGSO Satellite | Non-geostationary orbit satellite (e.g., Starlink) |
-| 70 | Unlicensed Fixed Wireless | Unlicensed spectrum fixed wireless |
-| 71 | Licensed Fixed Wireless | Licensed spectrum fixed wireless |
-| 72 | LBR Fixed Wireless | Low-band radio fixed wireless |
-| 0 | Other | Other technologies |
-
-### Time Periods
-
-Data is collected **semi-annually** in June and December. Each record is tagged with a time period in text format (e.g., "June 2023") and converted to a date (first day of the month: 2023-06-01).
-
-### Business/Residential Classification
-
-Services are tagged with availability codes:
-- **B** = Business customers only
-- **R** = Residential customers only  
-- **X** = Both business and residential customers
-
 ## Table Overview
 
 The Fiber Map Gold layer includes two primary tables optimized for different analysis needs:
@@ -126,87 +77,6 @@ The Fiber Map Gold layer includes two primary tables optimized for different ana
   </Card>
 </CardGroup>
 
-## Table Relationships
-
-The two Gold tables can be joined together, though in most cases you'll only need one or the other:
-
-```mermaid
-erDiagram
-    USA_ALL_PERIODS_FINAL ||--o{ USA_LOCATION_SUMMARY : "aggregates to"
-    
-    USA_ALL_PERIODS_FINAL {
-        string PRIMARY_KEY PK
-        number LOCATION_ID
-        string TIME_PERIOD
-        string BRAND_NAME
-        string TECHNOLOGY_NAME
-        number MAX_ADVERTISED_DOWNLOAD_SPEED
-        number MAX_ADVERTISED_UPLOAD_SPEED
-        string BUSINESS_RESIDENTIAL_CODE
-        string DOCSIS_CLASS
-    }
-    
-    USA_LOCATION_SUMMARY {
-        string PRIMARY_KEY PK
-        number LOCATION_ID
-        string TIME_PERIOD
-        string BRAND_NAME
-        string TECHNOLOGY_NAME
-    }
-```
-
-### Join Pattern
-
-When joining these tables in Lightdash or SQL:
-- Join on: `LOCATION_ID`, `TIME_PERIOD`, `BRAND_NAME`, and `TECHNOLOGY_NAME`
-- Use LEFT JOIN to preserve all records
-- Exclude synthetic rows where `TECHNOLOGY_NAME = 'All'` from `usa_location_summary`
-
-<Warning>
-When joining these tables, **exclude rows where `TECHNOLOGY_NAME = 'All'`** from `usa_location_summary`. These are synthetic rows added for Lightdash filtering and don't correspond to actual detail records.
-</Warning>
-
-## Data Architecture Layers
-
-While business users typically work with the **GOLD layer**, understanding the full architecture helps explain data lineage:
-
-```mermaid
-graph LR
-    A[FCC Source Data] --> B[CLEAN Layer]
-    B --> C[STAGE Layer]
-    C --> D[MODEL Layer]
-    D --> E[GOLD Layer]
-    E --> F[Lightdash]
-    E --> G[SQL Analysis]
-    
-    style E fill:#10b981,stroke:#059669,stroke-width:3px
-```
-
-### Layer Details
-
-**CLEAN Layer** (`FIBER_MAP.CLEAN.*`)
-- Raw FCC data, no transformations
-- Source of truth
-- Table: `USA_ALL_PERIODS_FINAL` (2.5B rows)
-
-**STAGE Layer** (`FIBER_MAP.DBT_STAGE.*`)
-- Standardized column names
-- Proper data types
-- Prefixed with `stg_`
-- Not typically used by analysts
-
-**MODEL Layer** (`FIBER_MAP.DBT_MODEL.*`)
-- Normalized business entities
-- Derived analytical fields
-- Prefixed with `mdl_`
-- Not typically used by analysts
-
-**GOLD Layer** (`FIBER_MAP.DBT_GOLD.*`) ← **Start here!**
-- Analysis-ready tables
-- Optimized for business questions
-- Denormalized with all necessary context
-- Where analysts should focus
-
 ## Primary Keys
 
 Both Gold tables include a `PRIMARY_KEY` field that uniquely identifies each row:
@@ -214,9 +84,6 @@ Both Gold tables include a `PRIMARY_KEY` field that uniquely identifies each row
 - **usa_all_periods_final**: MD5 hash of location + brand + time period + FRN + technology + business/residential code + speeds
 - **usa_location_summary**: MD5 hash of time period + brand + technology + location
 
-<Tip>
-Primary keys are useful for joining tables and ensuring record uniqueness, but for most business analysis, you'll filter and group by the human-readable dimension fields instead.
-</Tip>
 
 ## Next Steps
 
