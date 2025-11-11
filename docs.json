@@ -25,25 +25,32 @@
         "tab": "Fiber Map",
         "groups": [
           {
-            "group": "Project Overview",
+            "group": "Getting Started",
             "pages": [
-              "fiber-map/introduction",
-              "fiber-map/architecture",
-              "fiber-map/data-sources"
+              "fiber-map/overview"
             ]
           },
           {
-            "group": "Data Models",
+            "group": "Understanding the Data",
             "pages": [
-              "fiber-map/models/overview",
-              "fiber-map/models/gold-layer"
+              "fiber-map/data-model",
+              "fiber-map/key-metrics",
+              "fiber-map/calculations"
             ]
           },
           {
-            "group": "Usage & Guides",
+            "group": "Data Dictionary",
             "pages": [
-              "fiber-map/guides/getting-started",
-              "fiber-map/guides/querying-data"
+              "fiber-map/data-dictionary/overview",
+              "fiber-map/data-dictionary/gold-tables",
+              "fiber-map/data-dictionary/clean-tables"
+            ]
+          },
+          {
+            "group": "Data Quality & Support",
+            "pages": [
+              "fiber-map/data-quality",
+              "fiber-map/known-issues"
             ]
           }
         ]

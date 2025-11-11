@@ -1,0 +1,369 @@
+---
+title: "Data Quality & Limitations"
+description: "Understanding data quality controls, sampling methodology, and testing framework"
+icon: "shield-check"
+---
+
+## Overview
+
+The Fiber Map dataset implements comprehensive data quality controls to ensure reliability and accuracy. This page explains the quality assurance framework, sampling methodology, and known limitations of the data.
+
+---
+
+## Data Quality Controls
+
+### Primary Key Uniqueness Tests
+
+All Gold layer tables enforce strict uniqueness on primary keys using dbt tests.
+
+**Tables tested**:
+- `usa_all_periods_final`: Composite MD5 hash of all identifying fields
+- `usa_location_summary`: Composite MD5 hash of time + brand + technology + location
+
+**Test definition**:
+```yaml
+columns:
+  - name: primary_key
+    tests:
+      - unique
+      - not_null
+```
+
+**What this ensures**:
+- No duplicate rows in the table
+- Every row has a valid primary key
+- Data integrity at the grain level
+
+**When tests run**: Every time the dbt model is executed (on each pipeline run)
+
+### NOT NULL Tests
+
+Critical identifier fields are tested to ensure they always contain values:
+
+**Fields tested**:
+- PRIMARY_KEY
+- LOCATION_ID (indirectly via primary key composition)
+- BRAND_NAME (indirectly via primary key composition)
+- TIME_PERIOD (indirectly via primary key composition)
+
+**Purpose**: Prevent records with missing key identifying information from entering the Gold layer
+
+### Row Count Validation
+
+The dbt transformation pipeline includes row count monitoring to detect unexpected changes in data volume:
+
+**Validation checks**:
+1. **Input row count**: Verify Clean layer source data is complete
+2. **Output row count**: Verify Gold layer transformations produce expected volume
+3. **Row count differential**: Flag significant increases or decreases between runs
+
+**Alerting**: Data team is notified if row counts change by more than expected thresholds
+
+### Referential Integrity Checks
+
+**Philosophy**: "Do not assume referential integrity"
+
+The Fiber Map dataset comes from provider self-reporting and may contain:
+- Orphaned records (locations without geographic matches)
+- Inconsistent provider identifiers
+- Mismatched technology codes
+
+**Best practice**: Use **LEFT JOINs** when joining tables to avoid accidentally dropping records with referential integrity issues. Use Lightdash's join features or work with your data team for complex join requirements.
+
+---
+
+## Sampling Methodology
+
+### Current Gold Layer Sample
+
+**Sampling approach**: 2% random sample filtered to Indiana only
+
+**Original data**:
+- **RAW FCC data**: 5.2 billion rows (national, all time periods)
+- **CLEAN layer**: 2.5 billion rows (deduplicated and standardized)
+
+**Gold layer**:
+- **Target geography**: Indiana only
+- **Sampling rate**: 2% of Indiana records
+- **Resulting row count**: ~50 million rows in `usa_all_periods_final`
+
+### Why Sample?
+
+**Performance optimization**: The full national dataset (2.5B rows) is too large for interactive analysis. The 2% Indiana sample provides:
+- Fast query response times (<5 seconds for most queries)
+- Sufficient statistical significance for business analysis
+- Lower compute costs in Snowflake
+- Easier data exploration for business users
+
+**Geographic focus**: Indiana was selected as the initial market for detailed analysis. The full Clean layer contains all 50 states and remains available for national analysis.
+
+### Sample Selection Criteria
+
+**Method**: Random sampling at the location level
+
+**Randomization**: Uses Snowflake's SAMPLE function to select 2% of locations randomly
+
+**Time periods**: All time periods are included for sampled locations (June 2022 through December 2024)
+
+**Consistency**: The same 2% of locations are included across all time periods to enable longitudinal analysis
+
+### Sampling Implications
+
+<AccordionGroup>
+  <Accordion title="What's representative?" icon="check">
+    ✅ **Representative**:
+    - Technology mix (fiber, cable, wireless, satellite proportions)
+    - Provider market share
+    - Speed distributions
+    - Geographic patterns within Indiana
+    - Time-series trends
+    
+    The 2% sample is statistically large enough to accurately represent these characteristics.
+  </Accordion>
+  
+  <Accordion title="What's not precise?" icon="triangle-exclamation">
+    ⚠️ **Use caution for**:
+    - Absolute location counts (multiply by 50 to estimate full Indiana)
+    - Very small geographic areas (individual census blocks may not be represented)
+    - Rare provider-technology combinations
+    - Tail-end providers with limited footprints
+    
+    These may be under-represented or missing entirely in the 2% sample.
+  </Accordion>
+  
+  <Accordion title="How to estimate full counts" icon="calculator">
+    To estimate full Indiana location counts from the Gold layer sample:
+    
+    ```sql
+    SELECT 
+        BRAND_NAME,
+        COUNT(DISTINCT LOCATION_ID) AS SAMPLED_LOCATIONS,
+        COUNT(DISTINCT LOCATION_ID) * 50 AS ESTIMATED_FULL_LOCATIONS
+    FROM FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL
+    WHERE TIME_PERIOD = 'December 2024'
+    GROUP BY 1;
+    ```
+    
+    **Note**: This provides an estimate, not an exact count. For precise counts, query the Clean layer.
+  </Accordion>
+</AccordionGroup>
+
+### Accessing the Full Dataset
+
+If you need:
+- **National analysis** (multiple states)
+- **100% Indiana coverage** (not sampled)
+- **Precise absolute location counts**
+
+Query the **Clean layer**: `FIBER_MAP.CLEAN.USA_ALL_PERIODS_FINAL`
+
+<Warning>
+Clean layer queries may be slow due to the 2.5 billion row size. Use appropriate filters (STATE, TIME_PERIOD) and consider sampling for exploratory analysis.
+</Warning>
+
+---
+
+## Testing Framework
+
+### dbt Tests
+
+The Fiber Map project uses dbt's built-in testing framework to validate data quality:
+
+**Test categories**:
+1. **Schema tests**: Defined in YAML schema files (e.g., `_usa_all_periods_final.yml`)
+2. **Uniqueness tests**: Validate primary keys are unique
+3. **Not-null tests**: Ensure critical fields always have values
+4. **Relationship tests**: (Future enhancement) Validate foreign key relationships
+
+**Test execution**:
+```bash
+# Run all tests
+dbt test
+
+# Run tests for specific model
+dbt test --select usa_all_periods_final
+
+# Run specific test type
+dbt test --select test_type:unique
+```
+
+**Test failure handling**:
+- Pipeline execution stops if tests fail
+- Data team is notified
+- Root cause analysis is performed
+- Data is not promoted to Gold layer until issues are resolved
+
+### Custom Data Quality Checks
+
+Beyond standard dbt tests, the project implements custom validations:
+
+**1. Row count consistency**
+```sql
+-- Verify row count between Clean and Gold matches expected sample rate
+SELECT 
+    (SELECT COUNT(*) FROM FIBER_MAP.CLEAN.USA_ALL_PERIODS_FINAL 
+     WHERE STATE = 'INDIANA') AS CLEAN_INDIANA_ROWS,
+    (SELECT COUNT(*) FROM FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL) AS GOLD_SAMPLE_ROWS,
+    ROUND(100.0 * GOLD_SAMPLE_ROWS / CLEAN_INDIANA_ROWS, 2) AS SAMPLE_RATE
+-- Should be approximately 2%
+```
+
+**2. Location ID integrity**
+```sql
+-- Verify all LOCATION_IDs are valid numbers
+SELECT COUNT(*)
+FROM FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL
+WHERE LOCATION_ID IS NULL 
+   OR LOCATION_ID <= 0
+-- Should return 0
+```
+
+**3. Technology code validity**
+```sql
+-- Verify all technology codes map to valid names
+SELECT DISTINCT TECHNOLOGY
+FROM FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL
+WHERE TECHNOLOGY NOT IN (0, 10, 40, 50, 60, 61, 70, 71, 72)
+-- Should return no rows
+```
+
+**4. Time period consistency**
+```sql
+-- Verify TIME_PERIOD and TIME_PERIOD_DATE are aligned
+SELECT TIME_PERIOD, TIME_PERIOD_DATE, COUNT(*)
+FROM FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL
+WHERE TO_DATE(TIME_PERIOD, 'MMMM YYYY') != TIME_PERIOD_DATE
+GROUP BY 1, 2
+-- Should return no rows
+```
+
+### Data Freshness Expectations
+
+**Update frequency**: Semi-annual (June and December)
+
+**FCC Release Schedule**:
+- June data: Released in July-August
+- December data: Released in January-February
+
+**Pipeline refresh**:
+- Clean layer: Updated within 1 week of FCC release
+- Gold layer: Updated within 24 hours of Clean layer refresh
+
+**Staleness alerting**: Data team is alerted if Gold layer is more than 30 days behind the latest FCC release
+
+---
+
+## Known Data Quality Issues
+
+### Provider Self-Reporting
+
+**Issue**: Data comes from provider self-reporting to the FCC, not independent verification
+
+**Implications**:
+- Providers may over-report coverage (claim service where not actually available)
+- Speed claims are "up to" speeds, not guaranteed minimums
+- No verification of actual service quality or customer experience
+
+**Guidance**: Use this data for strategic analysis and trend identification, not as ground truth for individual address availability
+
+### Claimed vs. Actual Availability
+
+**Issue**: Data represents "claimed service availability," not verified service or actual customer connections
+
+**What this means**:
+- A location in the dataset = provider claims they *could* serve that location
+- Does not mean service is currently connected or customer is subscribed
+- May include locations that require additional infrastructure to actually connect
+
+**Business impact**: 
+- ✅ Good for: Market sizing, competitive landscape, technology trends
+- ⚠️ Use caution for: Precise address-level service validation
+
+### Data Collection Cadence
+
+**Issue**: Data is only collected twice per year (June and December)
+
+**Implications**:
+- Changes that occur between reporting periods are not captured
+- Provider expansions may not be visible for 3-6 months
+- Recent builds may not appear in the latest data
+
+**Mitigation**: Use BUILD_DATE field cautiously, understanding it shows "first reported" not "first built"
+
+### Geographic Precision
+
+**Issue**: Location-level data does not always correspond to exact street addresses
+
+**Details**:
+- LOCATION_ID maps to FCC's Broadband Serviceable Location Fabric
+- Census block is the finest geographic grain available
+- Individual address-level mapping may not be precise
+
+**Guidance**: Use for area-level analysis (county, ZIP code, census block), not for individual address validation
+
+---
+
+## Data Validation Checklist
+
+When using Fiber Map data, validate these aspects:
+
+<Steps>
+  <Step title="Check time period">
+    Always filter to a specific TIME_PERIOD to avoid double-counting locations across time periods
+    
+    ```sql
+    WHERE TIME_PERIOD = 'December 2024'
+    ```
+  </Step>
+  
+  <Step title="Use COUNT(DISTINCT LOCATION_ID)">
+    Always count distinct locations, never COUNT(*)
+    
+    ```sql
+    COUNT(DISTINCT LOCATION_ID)  -- Correct
+    -- Not: COUNT(*)  -- Wrong, counts all rows
+    ```
+  </Step>
+  
+  <Step title="Exclude synthetic rows when needed">
+    Filter out TECHNOLOGY_NAME = 'All' rows from usa_location_summary when joining or counting actual technologies
+    
+    ```sql
+    WHERE TECHNOLOGY_NAME != 'All'
+    ```
+  </Step>
+  
+  <Step title="Understand sample limitations">
+    Remember Gold layer is a 2% sample. Multiply by 50 to estimate full Indiana counts, or query Clean layer for precision.
+  </Step>
+  
+  <Step title="Use LEFT JOINs">
+    Prefer LEFT JOIN to INNER JOIN to avoid silently dropping records with referential integrity issues
+  </Step>
+</Steps>
+
+---
+
+## Getting Help
+
+If you encounter data quality issues:
+
+1. **Check this documentation** for known limitations
+2. **Review dbt test results** to see if the issue is flagged in automated tests
+3. **Query the Clean layer** to verify if the issue exists in source data
+4. **Contact the data team** for investigation and resolution
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Known Issues & FAQ" icon="circle-question" href="/fiber-map/known-issues">
+    Common questions and known limitations
+  </Card>
+  
+  <Card title="Data Dictionary" icon="book" href="/fiber-map/data-dictionary/overview">
+    Field definitions and usage notes
+  </Card>
+</CardGroup>
+

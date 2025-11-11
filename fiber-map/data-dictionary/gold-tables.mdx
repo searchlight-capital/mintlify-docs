@@ -1,0 +1,517 @@
+---
+title: "Gold Layer Tables"
+description: "Detailed field documentation for analysis-ready Gold tables"
+icon: "table"
+---
+
+## Overview
+
+The Gold layer contains analysis-ready tables optimized for business users. These tables are denormalized with all necessary context for easy querying.
+
+**Database**: `FIBER_MAP`  
+**Schema**: `DBT_GOLD`
+
+---
+
+## usa_all_periods_final
+
+**Fully Qualified Name**: `FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL`
+
+**Description**: Full detail broadband availability data with provider, technology, speed, and geographic information for each location and time period.
+
+**Grain**: One row per unique combination of:
+- Location ID
+- Brand + FRN (provider)
+- Technology Type
+- Time Period
+- Business/Residential Code  
+- Advertised Speeds
+
+**Row Count**: ~50 million records (Indiana 2% sample)
+
+**Best For**: Speed analysis, DOCSIS tracking, build-out timelines, census block geography, business vs. residential analysis
+
+### Dimensions
+
+<AccordionGroup>
+  <Accordion title="PRIMARY_KEY" icon="key">
+    **Type**: String (MD5 hash)
+    
+    **Description**: Unique identifier for each record, generated from composite key fields.
+    
+    **Composition**: MD5 hash of LOCATION_ID + BRAND_NAME + TIME_PERIOD + FRN + TECHNOLOGY + BUSINESS_RESIDENTIAL_CODE + speeds
+    
+    **Usage**: Ensure uniqueness in joins, identify duplicate records
+    
+    **Note**: This is a technical field. For business analysis, use the human-readable dimension fields instead.
+  </Accordion>
+  
+  <Accordion title="BRAND_NAME" icon="tag">
+    **Type**: String
+    
+    **Description**: Consumer-facing brand name of the broadband provider
+    
+    **Top 10 values** (by location count in Indiana):
+    - Comcast
+    - AT&T
+    - Verizon
+    - Frontier Communications
+    - T-Mobile
+    - Viasat
+    - HughesNet
+    - Starlink
+    - Metronet
+    - Smithville
+    
+    **Usage**: Primary field for provider analysis and market share calculations
+    
+    **Note**: One company may have multiple brand names (e.g., Comcast and Xfinity)
+  </Accordion>
+  
+  <Accordion title="FRN" icon="id-badge">
+    **Type**: String
+    
+    **Description**: FCC Registration Number - unique identifier assigned by the FCC to each provider entity
+    
+    **Format**: Numeric string (e.g., "0001234567")
+    
+    **Usage**: Join to FCC provider databases, distinguish between subsidiaries with similar brand names
+    
+    **Note**: Multiple brands may share the same FRN if owned by the same corporate entity
+  </Accordion>
+  
+  <Accordion title="PROVIDER_ID" icon="building">
+    **Type**: Number
+    
+    **Description**: Internal provider identifier used in FCC reporting
+    
+    **Usage**: Alternative provider identifier for grouping and filtering
+    
+    **Relationship**: Each FRN typically maps to one PROVIDER_ID
+  </Accordion>
+  
+  <Accordion title="LOCATION_ID" icon="location-dot">
+    **Type**: Number
+    
+    **Description**: Unique identifier for each broadband service location (typically a building or serviceable address)
+    
+    **Usage**: Core field for counting distinct locations and calculating market share
+    
+    **Critical**: Always use `COUNT(DISTINCT LOCATION_ID)` to count locations, as one location can appear in multiple rows
+    
+    **Associated Metric**: NUMBER_OF_LOCATIONS = COUNT_DISTINCT(LOCATION_ID)
+  </Accordion>
+  
+  <Accordion title="TECHNOLOGY" icon="tower-broadcast">
+    **Type**: Number
+    
+    **Description**: Numeric code representing the broadband technology type
+    
+    **Values**:
+    - 10 = Copper (DSL)
+    - 40 = Cable (DOCSIS)
+    - 50 = Fiber to the Premises
+    - 60 = GSO Satellite
+    - 61 = NGSO Satellite
+    - 70 = Unlicensed Fixed Wireless
+    - 71 = Licensed Fixed Wireless
+    - 72 = LBR Fixed Wireless
+    - 0 = Other
+    
+    **Usage**: Use TECHNOLOGY_NAME instead for business analysis (more readable)
+  </Accordion>
+  
+  <Accordion title="TECHNOLOGY_NAME" icon="signal">
+    **Type**: String
+    
+    **Description**: Human-readable name for the broadband technology type
+    
+    **Distribution** (Indiana sample):
+    - Cable: ~45% of location-provider combinations
+    - Fiber to the Premises: ~25%
+    - Licensed Fixed Wireless: ~15%
+    - NGSO Satellite: ~8%
+    - Copper: ~4%
+    - GSO Satellite: ~2%
+    - Unlicensed Fixed Wireless: ~1%
+    
+    **Usage**: Primary field for technology analysis
+    
+    **Preferred**: Use this instead of the numeric TECHNOLOGY code
+  </Accordion>
+  
+  <Accordion title="MAX_ADVERTISED_DOWNLOAD_SPEED" icon="download">
+    **Type**: Number
+    
+    **Description**: Maximum advertised download speed in Mbps (megabits per second)
+    
+    **Percentiles** (Indiana sample):
+    - 10th percentile: 25 Mbps
+    - 25th percentile: 100 Mbps
+    - Median: 300 Mbps
+    - 75th percentile: 1000 Mbps
+    - 90th percentile: 1200 Mbps
+    
+    **Usage**: Speed tier analysis, service comparison, gigabit availability tracking
+    
+    **Note**: These are advertised speeds, not actual measured speeds
+  </Accordion>
+  
+  <Accordion title="MAX_ADVERTISED_UPLOAD_SPEED" icon="upload">
+    **Type**: Number
+    
+    **Description**: Maximum advertised upload speed in Mbps (megabits per second)
+    
+    **Percentiles** (Indiana sample):
+    - 10th percentile: 3 Mbps
+    - 25th percentile: 10 Mbps
+    - Median: 35 Mbps
+    - 75th percentile: 300 Mbps
+    - 90th percentile: 1000 Mbps
+    
+    **Usage**: Symmetrical service analysis (compare to download speed), business service evaluation
+    
+    **Note**: Upload speeds are typically lower than download except for fiber
+  </Accordion>
+  
+  <Accordion title="LOW_LATENCY" icon="stopwatch">
+    **Type**: Number (0 or 1)
+    
+    **Description**: Indicator of whether the service meets FCC low latency thresholds
+    
+    **Values**:
+    - 1 = Low latency service (typically < 100ms)
+    - 0 = Higher latency service
+    
+    **Distribution**: Most terrestrial services (cable, fiber, fixed wireless) = 1; most satellite = 0
+    
+    **Usage**: Filter latency-sensitive applications, exclude high-latency satellite for certain analyses
+  </Accordion>
+  
+  <Accordion title="BUSINESS_RESIDENTIAL_CODE" icon="building">
+    **Type**: String (single character)
+    
+    **Description**: Indicates whether service is available to business, residential, or both customer types
+    
+    **Values**:
+    - **B** = Business customers only
+    - **R** = Residential customers only
+    - **X** = Both business and residential customers
+    
+    **Distribution** (Indiana sample):
+    - R (Residential only): ~60%
+    - X (Both): ~35%
+    - B (Business only): ~5%
+    
+    **Usage**: Filter to residential or business services, identify providers serving business customers
+  </Accordion>
+  
+  <Accordion title="BLOCK_GEOID" icon="map">
+    **Type**: String
+    
+    **Description**: Census block GEOID (geographic identifier) - the finest level of census geography
+    
+    **Format**: 15-digit code (State + County + Tract + Block)
+    
+    **Usage**: Geographic analysis at the census block level, mapping service availability
+    
+    **Note**: Census blocks are smaller than ZIP codes and provide more precise geographic analysis
+  </Accordion>
+  
+  <Accordion title="TIME_PERIOD" icon="calendar">
+    **Type**: String
+    
+    **Description**: Time period of the data snapshot in human-readable format
+    
+    **Available Periods**:
+    - June 2022
+    - December 2022
+    - June 2023
+    - December 2023
+    - June 2024
+    - December 2024
+    
+    **Usage**: Filter to specific time periods, display labels in visualizations
+    
+    **Note**: Data is collected semi-annually. Use TIME_PERIOD_DATE for time-series calculations.
+  </Accordion>
+  
+  <Accordion title="TIME_PERIOD_DATE" icon="calendar-days">
+    **Type**: Date
+    
+    **Description**: Time period as a date value (first day of the reporting month)
+    
+    **Format**: YYYY-MM-DD (e.g., 2024-12-01)
+    
+    **Usage**: Time-series analysis, date-based filtering, period-over-period calculations
+    
+    **Calculation**: Derived from TIME_PERIOD using TO_DATE(TIME_PERIOD, 'MMMM YYYY')
+  </Accordion>
+  
+  <Accordion title="BUILD_DATE" icon="calendar-check">
+    **Type**: Date
+    
+    **Description**: First date this location became available for this specific brand + technology combination in the dataset
+    
+    **Format**: YYYY-MM-DD
+    
+    **Calculation**: MIN(TIME_PERIOD_DATE) windowed by LOCATION_ID, BRAND_NAME, TECHNOLOGY
+    
+    **Usage**: Build-out timeline analysis, track when providers entered markets, identify recent expansions
+    
+    **Business Context**: Represents when service first appeared in FCC data, which may not be the exact construction date
+    
+    **Example**: If a location shows BUILD_DATE = 2023-06-01, the provider first reported serving that location with that technology in June 2023
+  </Accordion>
+  
+  <Accordion title="DOCSIS_CLASS" icon="signal-stream">
+    **Type**: String
+    
+    **Description**: DOCSIS (Data Over Cable Service Interface Specification) version classification for cable technology based on advertised speeds
+    
+    **Values**:
+    - **4.0**: Download > 1000 Mbps AND Upload > 1000 Mbps (symmetrical multi-gigabit)
+    - **3.1**: Download > 800 Mbps
+    - **2.0/3.0**: All others
+    
+    **Distribution** (Cable providers only in Indiana):
+    - 2.0/3.0: ~40%
+    - 3.1: ~55%
+    - 4.0: ~5%
+    
+    **Usage**: Track cable technology upgrades, identify markets with modern cable infrastructure
+    
+    **Note**: Only applicable to Cable (TECHNOLOGY = 40). NULL for all other technologies.
+  </Accordion>
+  
+  <Accordion title="STATE" icon="map-location">
+    **Type**: String
+    
+    **Description**: State name where the service is available
+    
+    **Current Value**: INDIANA (100% in current Gold layer sample)
+    
+    **Usage**: Geographic filtering, state-level aggregation
+    
+    **Note**: Full CLEAN layer includes all 50 states
+  </Accordion>
+  
+  <Accordion title="COUNTY" icon="map-pin">
+    **Type**: String
+    
+    **Description**: County name where the service is available
+    
+    **Top 10 Counties** (Indiana, by location count):
+    - Marion
+    - Lake
+    - Allen
+    - Hamilton
+    - St. Joseph
+    - Elkhart
+    - Tippecanoe
+    - Vanderburgh
+    - Porter
+    - Johnson
+    
+    **Usage**: County-level analysis, urban vs. rural comparisons
+  </Accordion>
+  
+  <Accordion title="ZCTA" icon="location-crosshairs">
+    **Type**: String
+    
+    **Description**: ZIP Code Tabulation Area - census approximation of USPS ZIP codes
+    
+    **Format**: 5-digit string (e.g., "46201")
+    
+    **Usage**: ZIP code-level analysis, market territory definition
+    
+    **Note**: ZCTAs are census geography and may not exactly match postal ZIP codes
+  </Accordion>
+  
+  <Accordion title="BRAND_TECH" icon="layer-group">
+    **Type**: String
+    
+    **Description**: Combined string of brand names with their technology codes at this location
+    
+    **Format**: Pipe-separated list (e.g., "Comcast (40)|AT&T (50)")
+    
+    **Usage**: Advanced analysis of technology combinations at a single location
+    
+    **Note**: This is a composite field. For most analysis, filter BRAND_NAME and TECHNOLOGY separately.
+  </Accordion>
+  
+  <Accordion title="BRAND_NAMES" icon="tags">
+    **Type**: String
+    
+    **Description**: Pipe-separated list of all brand names available at this location
+    
+    **Format**: "Brand1|Brand2|Brand3"
+    
+    **Usage**: Identify locations with multiple providers, competition analysis
+    
+    **Example**: "Comcast|AT&T|T-Mobile"
+  </Accordion>
+  
+  <Accordion title="TECHNOLOGIES" icon="list">
+    **Type**: String
+    
+    **Description**: Pipe-separated list of all technology codes available at this location
+    
+    **Format**: "40|50|71" (numeric codes)
+    
+    **Usage**: Technology diversity analysis
+    
+    **Preferred**: Use TECHNOLOGIES_DESCRIPTOR for human-readable names
+  </Accordion>
+  
+  <Accordion title="TECHNOLOGY_DESCRIPTOR" icon="file-lines">
+    **Type**: String
+    
+    **Description**: Human-readable description of the technology type (same as TECHNOLOGY_NAME)
+    
+    **Usage**: Equivalent to TECHNOLOGY_NAME, use either one
+  </Accordion>
+  
+  <Accordion title="TECHNOLOGIES_DESCRIPTOR" icon="list-check">
+    **Type**: String
+    
+    **Description**: Pipe-separated list of all human-readable technology types available at this location
+    
+    **Format**: "Cable|Fiber to the Premises|Licensed Fixed Wireless"
+    
+    **Usage**: Display all technologies available at a location
+  </Accordion>
+  
+  <Accordion title="BRAND_TECH_DESCRIPTOR" icon="tags">
+    **Type**: String
+    
+    **Description**: Combined string of brand names with their human-readable technology types at this location
+    
+    **Format**: "Comcast (Cable)|AT&T (Fiber to the Premises)"
+    
+    **Usage**: Display full provider-technology combinations for a location
+  </Accordion>
+</AccordionGroup>
+
+### Analysis in Lightdash
+
+Use this table when you need detailed attributes like speeds, DOCSIS class, business/residential codes, or build dates. Group by provider and technology dimensions, and use the pre-configured `NUMBER_OF_LOCATIONS` metric.
+
+---
+
+## usa_location_summary
+
+**Fully Qualified Name**: `FIBER_MAP.DBT_GOLD.USA_LOCATION_SUMMARY`
+
+**Description**: Aggregated summary of broadband availability optimized for location counting and market share analysis. Includes synthetic "All" technology rows for dashboard filtering.
+
+**Grain**: One row per unique combination of:
+- Time Period
+- Brand Name
+- Technology Name (including synthetic "All" values)
+- Location ID
+
+**Row Count**: ~5-10 million records (Indiana 2% sample)
+
+**Best For**: Location counts, market share, provider footprint, Lightdash dashboards
+
+### Dimensions
+
+<AccordionGroup>
+  <Accordion title="PRIMARY_KEY" icon="key">
+    **Type**: String (MD5 hash)
+    
+    **Description**: Unique identifier for each record
+    
+    **Composition**: MD5 hash of TIME_PERIOD + BRAND_NAME + TECHNOLOGY_NAME + LOCATION_ID
+    
+    **Usage**: Ensure uniqueness, join to other tables
+  </Accordion>
+  
+  <Accordion title="TIME_PERIOD" icon="calendar">
+    **Type**: String
+    
+    **Description**: Time period of the data snapshot
+    
+    **Available Values**:
+    - June 2022
+    - December 2022
+    - June 2023
+    - December 2023
+    - June 2024
+    - December 2024
+    
+    **Usage**: Filter and group by time period
+  </Accordion>
+  
+  <Accordion title="TIME_PERIOD_DATE" icon="calendar-days">
+    **Type**: Date
+    
+    **Description**: Time period as a date (first day of month)
+    
+    **Format**: YYYY-MM-DD
+    
+    **Usage**: Date-based filtering and time-series analysis
+  </Accordion>
+  
+  <Accordion title="BRAND_NAME" icon="tag">
+    **Type**: String
+    
+    **Description**: Provider brand name
+    
+    **Top Values**: Same as usa_all_periods_final (Comcast, AT&T, Verizon, etc.)
+    
+    **Usage**: Provider analysis and filtering
+  </Accordion>
+  
+  <Accordion title="TECHNOLOGY_NAME" icon="signal">
+    **Type**: String
+    
+    **Description**: Technology type name
+    
+    **Values**: 
+    - All standard technology names (Cable, Fiber to the Premises, etc.)
+    - **"All"** - Synthetic value for parameter filtering
+    
+    **Important**: This table includes synthetic rows where TECHNOLOGY_NAME = 'All' to support Lightdash parameter-driven filtering. When joining to other tables, filter these out: `WHERE TECHNOLOGY_NAME != 'All'`
+    
+    **Usage**: Technology filtering and grouping
+  </Accordion>
+  
+  <Accordion title="LOCATION_ID" icon="location-dot">
+    **Type**: Number
+    
+    **Description**: Unique location identifier
+    
+    **Usage**: Count distinct locations for market sizing
+    
+    **Metric**: NUMBER_OF_LOCATIONS = COUNT_DISTINCT(LOCATION_ID)
+  </Accordion>
+</AccordionGroup>
+
+### Synthetic "All" Technology Rows
+
+This table includes special rows where `TECHNOLOGY_NAME = 'All'` for each location, brand, and time period combination. These rows enable Lightdash dashboards to show "all technologies" as a filter option without creating duplicate counts.
+
+**When to exclude**: Filter out `TECHNOLOGY_NAME = 'All'` when you need actual technology breakdowns or when joining to other tables.
+
+**When to keep**: When building Lightdash dashboards that use technology as a parameter filter.
+
+### Analysis in Lightdash
+
+Use this table for fast location counting and market share analysis. It's optimized for performance and works best with the `NUMBER_OF_LOCATIONS` and `PERCENT_OF_LOCATIONS` metrics.
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Clean Layer Tables" icon="database" href="/fiber-map/data-dictionary/clean-tables">
+    Reference documentation for source data
+  </Card>
+  
+  <Card title="Calculations & Logic" icon="function" href="/fiber-map/calculations">
+    Understand how fields are calculated
+  </Card>
+</CardGroup>
+

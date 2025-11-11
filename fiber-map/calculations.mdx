@@ -1,0 +1,306 @@
+---
+title: "Calculations & Logic"
+description: "Understanding how derived fields and metrics are calculated"
+icon: "function"
+---
+
+## Overview
+
+Several fields in the Fiber Map dataset are calculated or derived from other fields. This page explains the logic behind these calculations so you can understand what they mean and use them correctly.
+
+---
+
+## Technology Code Mapping
+
+**Field**: `TECHNOLOGY_NAME`  
+**Source**: `TECHNOLOGY` (numeric code)  
+**Purpose**: Convert numeric technology codes into human-readable names
+
+### Mapping Table
+
+| Numeric Code | Technology Name | Description |
+|--------------|-----------------|-------------|
+| 10 | Copper | DSL (Digital Subscriber Line) over phone lines |
+| 40 | Cable | Cable modem via TV cable infrastructure |
+| 50 | Fiber to the Premises | Direct fiber optic connection to building |
+| 60 | GSO Satellite | Geostationary orbit satellite (traditional satellite) |
+| 61 | NGSO Satellite | Non-geostationary orbit satellite (e.g., Starlink, OneWeb) |
+| 70 | Unlicensed Fixed Wireless | Fixed wireless using unlicensed spectrum (e.g., Wi-Fi frequencies) |
+| 71 | Licensed Fixed Wireless | Fixed wireless using licensed spectrum (e.g., cellular bands) |
+| 72 | LBR Fixed Wireless | Low-Band Radio fixed wireless |
+| 0 | Other | Other or unknown technologies |
+
+### SQL Logic
+
+```sql
+CASE 
+    WHEN TECHNOLOGY = 10 THEN 'Copper'
+    WHEN TECHNOLOGY = 40 THEN 'Cable'
+    WHEN TECHNOLOGY = 50 THEN 'Fiber to the Premises'
+    WHEN TECHNOLOGY = 60 THEN 'GSO Satellite'
+    WHEN TECHNOLOGY = 61 THEN 'NGSO Satellite'
+    WHEN TECHNOLOGY = 70 THEN 'Unlicensed Fixed Wireless'
+    WHEN TECHNOLOGY = 71 THEN 'Licensed Fixed Wireless'
+    WHEN TECHNOLOGY = 72 THEN 'LBR Fixed Wireless'
+    WHEN TECHNOLOGY = 0 THEN 'Other'
+    ELSE 'Unknown'
+END AS TECHNOLOGY_NAME
+```
+
+### Business Context
+
+These technology types represent fundamentally different approaches to delivering broadband:
+
+- **Fiber**: Highest capacity and most symmetrical speeds, but highest infrastructure cost
+- **Cable**: High capacity with asymmetrical speeds, leverages existing TV infrastructure
+- **Fixed Wireless**: Lower infrastructure cost, speeds vary by spectrum and line-of-sight
+- **Satellite**: Widest coverage including remote areas, typically higher latency
+- **Copper (DSL)**: Legacy technology, limited speeds, declining deployment
+
+---
+
+## DOCSIS Classification Logic
+
+**Field**: `DOCSIS_CLASS`  
+**Source**: `MAX_ADVERTISED_DOWNLOAD_SPEED` and `MAX_ADVERTISED_UPLOAD_SPEED`  
+**Purpose**: Classify cable technology versions based on speed capabilities  
+**Applies to**: Cable providers only (TECHNOLOGY = 40)
+
+### Classification Rules
+
+| DOCSIS Version | Download Speed | Upload Speed | Description |
+|----------------|----------------|--------------|-------------|
+| **4.0** | > 1000 Mbps | > 1000 Mbps | Symmetrical multi-gigabit (both down & up > 1 Gbps) |
+| **3.1** | > 800 Mbps | Any | High-speed asymmetrical (down > 800 Mbps) |
+| **2.0/3.0** | ≤ 800 Mbps | Any | Standard cable speeds |
+
+### SQL Logic
+
+```sql
+CASE 
+    WHEN MAX_ADVERTISED_DOWNLOAD_SPEED > 1000 
+        AND MAX_ADVERTISED_UPLOAD_SPEED > 1000 
+        THEN '4.0'
+    WHEN MAX_ADVERTISED_DOWNLOAD_SPEED > 800 
+        THEN '3.1'
+    ELSE '2.0/3.0'
+END AS DOCSIS_CLASS
+```
+
+### Business Context
+
+**DOCSIS** (Data Over Cable Service Interface Specification) is the standard that defines how cable companies deliver internet over TV cable infrastructure. Newer versions support higher speeds:
+
+- **DOCSIS 2.0 / 3.0**: Standard cable internet, typically up to 800 Mbps download
+- **DOCSIS 3.1**: Gigabit cable internet, up to 10 Gbps download (asymmetric)
+- **DOCSIS 4.0**: Multi-gigabit symmetric service, competing directly with fiber
+
+### Usage in Lightdash
+
+Track DOCSIS deployment by grouping by `DOCSIS_CLASS` and filtering to `TECHNOLOGY_NAME = 'Cable'`.
+
+<Note>
+`DOCSIS_CLASS` is NULL for all non-cable technologies (fiber, wireless, satellite, etc.). This is expected and correct - DOCSIS only applies to cable.
+</Note>
+
+---
+
+## BUILD_DATE Calculation
+
+**Field**: `BUILD_DATE`  
+**Source**: `TIME_PERIOD_DATE`  
+**Purpose**: Identify when a provider first started offering a specific technology at each location  
+**Calculation Method**: Window function with MIN()
+
+### SQL Logic
+
+```sql
+MIN(TO_DATE(TIME_PERIOD, 'MMMM YYYY')) OVER (
+    PARTITION BY LOCATION_ID, BRAND_NAME, TECHNOLOGY
+) AS BUILD_DATE
+```
+
+### How It Works
+
+For each unique combination of:
+- Location (LOCATION_ID)
+- Provider (BRAND_NAME)  
+- Technology (TECHNOLOGY)
+
+The calculation finds the **earliest TIME_PERIOD_DATE** when that combination first appears in the dataset.
+
+### Example
+
+| LOCATION_ID | BRAND_NAME | TECHNOLOGY | TIME_PERIOD | TIME_PERIOD_DATE | BUILD_DATE |
+|-------------|------------|------------|-------------|------------------|------------|
+| 12345 | Comcast | 40 (Cable) | June 2022 | 2022-06-01 | **2022-06-01** |
+| 12345 | Comcast | 40 (Cable) | December 2022 | 2022-12-01 | **2022-06-01** |
+| 12345 | Comcast | 40 (Cable) | June 2023 | 2023-06-01 | **2022-06-01** |
+| 12345 | Comcast | 50 (Fiber) | December 2023 | 2023-12-01 | **2023-12-01** |
+| 12345 | AT&T | 50 (Fiber) | June 2022 | 2022-06-01 | **2022-06-01** |
+
+**Key Observations**:
+- Comcast Cable: BUILD_DATE = 2022-06-01 (first appeared in June 2022)
+- Comcast Fiber: BUILD_DATE = 2023-12-01 (first appeared in December 2023, upgraded technology)
+- AT&T Fiber: BUILD_DATE = 2022-06-01 (different provider, separate build date)
+
+### Business Use Cases in Lightdash
+
+- **Track Service Expansion**: Filter by provider and technology, group by `BUILD_DATE` to see when they entered markets
+- **Identify Recent Builds**: Filter by date range on `BUILD_DATE` field
+- **Analyze Build-Out Timelines**: Use `BUILD_DATE` as a time dimension to track expansion velocity
+
+### Important Limitations
+
+<Warning>
+**BUILD_DATE represents when the service first appeared in FCC reporting data, not necessarily the actual construction date.**
+
+- Data collection started in June 2022, so no BUILD_DATE can be earlier than 2022-06-01
+- If a provider served a location before June 2022, BUILD_DATE will show 2022-06-01 (the first reporting period)
+- BUILD_DATE indicates "first observed" rather than "first built"
+- There can be a lag between actual construction and FCC reporting
+</Warning>
+
+---
+
+## TIME_PERIOD_DATE Conversion
+
+**Field**: `TIME_PERIOD_DATE`  
+**Source**: `TIME_PERIOD` (text string)  
+**Purpose**: Convert human-readable time periods into dates for time-series analysis
+
+### Conversion Logic
+
+```sql
+TO_DATE(TIME_PERIOD, 'MMMM YYYY') AS TIME_PERIOD_DATE
+```
+
+### Examples
+
+| TIME_PERIOD (Input) | TIME_PERIOD_DATE (Output) |
+|---------------------|---------------------------|
+| June 2022 | 2022-06-01 |
+| December 2022 | 2022-12-01 |
+| June 2023 | 2023-06-01 |
+| December 2023 | 2023-12-01 |
+| June 2024 | 2024-06-01 |
+| December 2024 | 2024-12-01 |
+
+**Result**: Always the **first day of the month**
+
+### Why This Matters
+
+Date fields enable:
+- Time-series visualizations and trend lines
+- Date-based filtering (e.g., `WHERE TIME_PERIOD_DATE >= '2023-01-01'`)
+- Period-over-period calculations
+- Date arithmetic (e.g., DATEDIFF, DATEADD)
+
+### Usage in Lightdash
+
+Use `TIME_PERIOD_DATE` for time-series visualizations and period-over-period comparisons with Lightdash's date filtering and table calculations.
+
+---
+
+## Primary Key Generation
+
+**Field**: `PRIMARY_KEY`  
+**Purpose**: Create a unique identifier for each row using composite business keys  
+**Method**: MD5 hash
+
+### usa_all_periods_final
+
+```sql
+MD5(
+    COALESCE(CAST(LOCATION_ID AS VARCHAR), '') || '|' ||
+    COALESCE(BRAND_NAME, '') || '|' ||
+    COALESCE(TIME_PERIOD, '') || '|' ||
+    COALESCE(FRN, '') || '|' ||
+    COALESCE(CAST(TECHNOLOGY AS VARCHAR), '') || '|' ||
+    COALESCE(BUSINESS_RESIDENTIAL_CODE, '') || '|' ||
+    COALESCE(CAST(MAX_ADVERTISED_DOWNLOAD_SPEED AS VARCHAR), '') || '|' ||
+    COALESCE(CAST(MAX_ADVERTISED_UPLOAD_SPEED AS VARCHAR), '')
+) AS PRIMARY_KEY
+```
+
+**Components**: All fields that make a row unique
+
+### usa_location_summary
+
+```sql
+MD5(
+    COALESCE(TIME_PERIOD, '') || '|' ||
+    COALESCE(BRAND_NAME, '') || '|' ||
+    COALESCE(TECHNOLOGY_NAME, '') || '|' ||
+    COALESCE(CAST(LOCATION_ID AS VARCHAR), '')
+) AS PRIMARY_KEY
+```
+
+**Components**: Simpler grain for aggregated table
+
+### Why MD5?
+
+- Creates a fixed-length (32 character) unique identifier
+- Deterministic: same inputs always produce same hash
+- Handles NULL values safely with COALESCE
+- More compact than concatenating all fields directly
+
+### Usage
+
+Primary keys are useful for:
+- Ensuring row uniqueness in dbt tests
+- Joining tables reliably
+- Identifying specific records for data quality checks
+
+<Info>
+For most business analysis, you'll filter and group by the human-readable dimension fields (BRAND_NAME, TECHNOLOGY_NAME, etc.) rather than PRIMARY_KEY.
+</Info>
+
+---
+
+## Business/Residential Code
+
+**Field**: `BUSINESS_RESIDENTIAL_CODE`  
+**Source**: Provider reporting to FCC  
+**Purpose**: Indicate whether service is available to business, residential, or both customer types
+
+### Values
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| **B** | Business only | Service available exclusively to business customers |
+| **R** | Residential only | Service available exclusively to residential customers |
+| **X** | Both | Service available to both business and residential customers |
+
+### Distribution
+
+In the Indiana sample:
+- **R (Residential only)**: ~60% of records
+- **X (Both)**: ~35% of records
+- **B (Business only)**: ~5% of records
+
+### Business Context
+
+- Many providers offer similar technologies to both markets but differentiate by SLAs, support, and pricing
+- Some rural providers focus exclusively on residential customers
+- Some metropolitan fiber providers target business customers only
+- The "X" designation is most common for established providers with broad market coverage
+
+### Usage in Lightdash
+
+Filter by `BUSINESS_RESIDENTIAL_CODE` to analyze business-only (B), residential-only (R), or both (X) service availability.
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Dictionary" icon="book" href="/fiber-map/data-dictionary/overview">
+    See where these calculated fields appear in tables
+  </Card>
+  
+  <Card title="Data Quality" icon="shield-check" href="/fiber-map/data-quality">
+    Learn about data validation and quality controls
+  </Card>
+</CardGroup>
+
