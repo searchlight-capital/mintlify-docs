@@ -1,0 +1,273 @@
+---
+title: "usa_location_summary"
+description: "Aggregated location-level summary for fast market share analysis"
+icon: "table"
+---
+
+## Overview
+
+**Fully Qualified Name**: `FIBER_MAP.DBT_GOLD.USA_LOCATION_SUMMARY`
+
+**Purpose**: Aggregated summary providing a simplified view of location-level service availability, optimized for fast location counting and market share analysis.
+
+**Grain**: One row per combination of:
+- Time Period
+- Provider Brand
+- Technology Name (including synthetic "All" values)
+- Location ID
+
+**Typical Row Count**: ~5-10 million records (Indiana 2% sample)
+
+## When to Use This Table
+
+<CardGroup cols={2}>
+  <Card title="Fast Location Counting" icon="hashtag">
+    Optimized for quick location counts without scanning speed details
+  </Card>
+  
+  <Card title="Market Share Analysis" icon="chart-pie">
+    Simplified grain makes provider footprint analysis faster
+  </Card>
+  
+  <Card title="Lightdash Dashboards" icon="chart-mixed">
+    Includes synthetic "All" technology rows for parameter filtering
+  </Card>
+  
+  <Card title="Market Sizing" icon="ruler">
+    Quick queries for addressable market and provider coverage
+  </Card>
+</CardGroup>
+
+Use **usa_all_periods_final** instead when you need speed information, DOCSIS classification, business/residential codes, or census block detail.
+
+---
+
+## Key Metrics
+
+### Number of Locations
+
+**Metric Name**: `NUMBER_OF_LOCATIONS`
+
+**Definition**: Distinct count of broadband service locations
+
+**Calculation**: `COUNT_DISTINCT(LOCATION_ID)`
+
+**Business Context**
+
+This is the fundamental metric for market sizing and coverage analysis. It answers questions like:
+- How many locations does Provider X serve?
+- What's the size of the addressable market in County Y?
+- How many locations have fiber service available?
+
+<Warning>
+Always use `COUNT(DISTINCT LOCATION_ID)` rather than `COUNT(*)` when counting locations. A single location may have multiple rows due to different providers or technologies.
+</Warning>
+
+### Percent of Locations
+
+**Metric Name**: `PERCENT_OF_LOCATIONS`
+
+**Definition**: Percentage of total locations in the dataset
+
+**Calculation**: `(Location count / Total locations) * 100`
+
+---
+
+## Calculated Fields & Logic
+
+### Technology Code Mapping
+
+**Field**: `TECHNOLOGY_NAME`
+
+The dataset converts numeric technology codes into human-readable names:
+
+| Technology Name | Description |
+|-----------------|-------------|
+| Copper | DSL (Digital Subscriber Line) over phone lines |
+| Cable | Cable modem via TV cable infrastructure |
+| Fiber to the Premises | Direct fiber optic connection to building |
+| GSO Satellite | Geostationary orbit satellite (traditional satellite) |
+| NGSO Satellite | Non-geostationary orbit satellite (e.g., Starlink, OneWeb) |
+| Unlicensed Fixed Wireless | Fixed wireless using unlicensed spectrum |
+| Licensed Fixed Wireless | Fixed wireless using licensed spectrum |
+| LBR Fixed Wireless | Low-Band Radio fixed wireless |
+| Other | Other or unknown technologies |
+| **All** | **Synthetic value for Lightdash parameter filtering** |
+
+<Note>
+This table includes a special **"All"** technology value that doesn't exist in the source data. These synthetic rows enable Lightdash dashboards to show "all technologies" as a filter option without creating duplicate counts.
+</Note>
+
+### TIME_PERIOD_DATE Conversion
+
+**Field**: `TIME_PERIOD_DATE`  
+**Source**: `TIME_PERIOD` (text string)  
+**Purpose**: Convert human-readable time periods into dates for time-series analysis
+
+```sql
+TO_DATE(TIME_PERIOD, 'MMMM YYYY') AS TIME_PERIOD_DATE
+```
+
+| TIME_PERIOD (Input) | TIME_PERIOD_DATE (Output) |
+|---------------------|---------------------------|
+| June 2022 | 2022-06-01 |
+| December 2022 | 2022-12-01 |
+| June 2023 | 2023-06-01 |
+| December 2023 | 2023-12-01 |
+
+**Result**: Always the **first day of the month**
+
+### Primary Key Generation
+
+**Field**: `PRIMARY_KEY`  
+**Purpose**: Create a unique identifier for each row
+
+```sql
+MD5(
+    COALESCE(TIME_PERIOD, '') || '|' ||
+    COALESCE(BRAND_NAME, '') || '|' ||
+    COALESCE(TECHNOLOGY_NAME, '') || '|' ||
+    COALESCE(CAST(LOCATION_ID AS VARCHAR), '')
+) AS PRIMARY_KEY
+```
+
+Creates a fixed-length (32 character) unique identifier from the composite key fields.
+
+---
+
+## Field Reference
+
+### Dimensions
+
+<AccordionGroup>
+  <Accordion title="PRIMARY_KEY" icon="key">
+    **Type**: String (MD5 hash)
+    
+    **Description**: Unique identifier for each record
+    
+    **Composition**: MD5 hash of TIME_PERIOD + BRAND_NAME + TECHNOLOGY_NAME + LOCATION_ID
+    
+    **Usage**: Ensure uniqueness, join to other tables
+  </Accordion>
+  
+  <Accordion title="TIME_PERIOD" icon="calendar">
+    **Type**: String
+    
+    **Description**: Time period of the data snapshot
+    
+    **Available Values**:
+    - June 2022
+    - December 2022
+    - June 2023
+    - December 2023
+    - June 2024
+    - December 2024
+    
+    **Usage**: Filter and group by time period
+  </Accordion>
+  
+  <Accordion title="TIME_PERIOD_DATE" icon="calendar-days">
+    **Type**: Date
+    
+    **Description**: Time period as a date (first day of month)
+    
+    **Format**: YYYY-MM-DD
+    
+    **Usage**: Date-based filtering and time-series analysis
+  </Accordion>
+  
+  <Accordion title="BRAND_NAME" icon="tag">
+    **Type**: String
+    
+    **Description**: Provider brand name
+    
+    **Top Values**: Comcast, AT&T, Verizon, Frontier Communications, T-Mobile, Viasat, HughesNet, Starlink, Metronet, Smithville
+    
+    **Usage**: Provider analysis and filtering
+  </Accordion>
+  
+  <Accordion title="TECHNOLOGY_NAME" icon="signal">
+    **Type**: String
+    
+    **Description**: Technology type name
+    
+    **Values**: 
+    - All standard technology names (Cable, Fiber to the Premises, Licensed Fixed Wireless, etc.)
+    - **"All"** - Synthetic value for parameter filtering
+    
+    **Important**: This table includes synthetic rows where TECHNOLOGY_NAME = 'All' to support Lightdash parameter-driven filtering. When joining to other tables, filter these out: `WHERE TECHNOLOGY_NAME != 'All'`
+    
+    **Usage**: Technology filtering and grouping
+  </Accordion>
+  
+  <Accordion title="LOCATION_ID" icon="location-dot">
+    **Type**: Number
+    
+    **Description**: Unique location identifier
+    
+    **Usage**: Count distinct locations for market sizing
+    
+    **Metric**: NUMBER_OF_LOCATIONS = COUNT_DISTINCT(LOCATION_ID)
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Synthetic "All" Technology Rows
+
+This table includes special rows where `TECHNOLOGY_NAME = 'All'` for each location, brand, and time period combination. These rows enable Lightdash dashboards to show "all technologies" as a filter option without creating duplicate counts.
+
+**When to exclude**: Filter out `TECHNOLOGY_NAME = 'All'` when you need actual technology breakdowns or when joining to other tables.
+
+**When to keep**: When building Lightdash dashboards that use technology as a parameter filter.
+
+**Example Query Pattern**:
+
+```sql
+-- For technology-specific analysis, exclude "All" rows
+SELECT 
+    BRAND_NAME,
+    TECHNOLOGY_NAME,
+    COUNT(DISTINCT LOCATION_ID) as LOCATION_COUNT
+FROM FIBER_MAP.DBT_GOLD.USA_LOCATION_SUMMARY
+WHERE TECHNOLOGY_NAME != 'All'
+GROUP BY BRAND_NAME, TECHNOLOGY_NAME
+```
+
+---
+
+## Performance Benefits
+
+This table is optimized for fast queries because it:
+
+1. **Removes speed attributes**: No need to scan MAX_ADVERTISED_DOWNLOAD_SPEED or MAX_ADVERTISED_UPLOAD_SPEED
+2. **Simplified grain**: Fewer rows per location (one per brand + technology instead of one per speed tier)
+3. **Pre-aggregated**: No complex window functions needed for basic counts
+4. **Smaller footprint**: ~10x fewer rows than usa_all_periods_final
+
+**Example Performance Difference**:
+- usa_all_periods_final: ~50 million rows
+- usa_location_summary: ~5-10 million rows
+
+For location counting queries, this table is typically **5-10x faster**.
+
+---
+
+## Analysis in Lightdash
+
+Use this table for:
+- Fast location counts and market share analysis
+- Provider footprint comparison
+- Simple technology breakdowns
+- Dashboard parameter filtering with the "All" technology option
+
+The pre-configured `NUMBER_OF_LOCATIONS` and `PERCENT_OF_LOCATIONS` metrics work seamlessly with this table.
+
+---
+
+## Next Steps
+
+<Card title="usa_all_periods_final" icon="table" href="/fiber-map/usa-all-periods-final">
+  View the detailed table with speed and DOCSIS information
+</Card>
+
