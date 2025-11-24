@@ -1,0 +1,65 @@
+---
+title: 'Snowflake MCP Configuration'
+description: 'Setup guide for the Snowflake Model Context Protocol (MCP) Server'
+---
+
+The Snowflake MCP server enables AI tools like Claude and Cursor to directly query and inspect data in Snowflake.
+
+## Admin Setup
+
+This section is for Data Engineers configuring the integration for the first time.
+
+### Prerequisites
+*   `ACCOUNTADMIN` role access in Snowflake.
+*   Official [Snowflake Cortex Agents MCP documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-mcp).
+
+### 1. Create Roles and Integration
+In Snowflake, you need to set up the specific roles and security integration to allow the MCP client to authenticate. Here we describe how to set up an integration for Claude. Other integrations would be required for other clients, replacing the oauth_callback field as appropriate. 
+
+Key configuration details for our environment:
+*   **MCP Role**: Ensure a role (e.g., `MCP`) is created and has ownership/usage on the MCP server.
+*   **Security Integration**: Create an integration (e.g., `MCPCLAUDE`) with `OAUTH_CLIENT = CUSTOM` (not GENERIC) and `OAUTH_CLIENT_TYPE = 'PUBLIC'`.
+*   **Redirect URI**: Must be set to `https://claude.ai/api/mcp/auth_callback`.
+*   **Pre-Authorized Roles**: Set `PRE_AUTHORIZED_ROLES_LIST = ('MCP')` to streamline user consent.
+
+### 2. Provision the MCP Server
+Deploy the MCP server object in Snowflake:
+*   **Schema**: `MCP.PUBLIC` (or preferred location).
+*   **Server Name**: `SEARCHLIGHT`.
+*   **Grants**: Grant `USAGE` (and optionally `MODIFY`) to the `MCP` role.
+
+### 3. Distribute Connection Details
+Users will need the following details to connect:
+*   **Remote URL**: `https://<account_identifier>.snowflakecomputing.com/api/v2/databases/MCP/schemas/PUBLIC/mcp-servers/SEARCHLIGHT` (replace database, schema, and MCP server names as appropriate if using different names)
+*   **Client ID** and **Client Secret**: Generated from the Security Integration (use SELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('MCPCLAUDE');).
+*   **Account Identifier**: Use the `zh06779` format (region-specific) - we found that the alternative account locator format failed in testing.
+
+### 4. Grant access to users
+```sql
+GRANT ROLE MCP TO USER <your_username>;
+```
+
+## User Setup
+
+This section is for Business Users and Analysts connecting Claude to Snowflake.
+
+### 1. Gain Access
+Ensure your Snowflake user has been granted the `MCP` role. Ask your Snowflake admin.
+
+### 2. Configure Claude
+1.  Open **Claude.ai**.
+2.  Navigate to **Settings** > **Connectors** > **Add custom connector**.
+3.  Name it Snowflake
+4.  Enter the connection details provided by your admin (URL, Client ID, etc.).
+5.  When your browser goes to the authentication screen, replace the ROLE=ALL parameter with ROLE=MCP. 
+5.  When prompted to authenticate, ensure you select the **MCP role** if asked, or ensure your default role has access.
+
+### 3. Verify Connection
+1.  Start a new chat. You should see Snowflake as an available connector under the options button. 
+2.  Type: *"Show me a list of the databases in Snowflake."*
+3.  Claude should use the `snowflake` tool to query the database and list the tables.
+
+### Troubleshooting
+*   **Authentication Fails**: Check if the `OAUTH_CLIENT` type is set to `CUSTOM` and not `GENERIC` (a known issue in some docs).
+*   **Permissions**: Verify `SHOW GRANTS ON MCP SERVER MCP.PUBLIC.SEARCHLIGHT` shows your role has usage.
+*   **Phone a friend**: Miles spent a lot of time banging his head against a wall getting this to work first time. Ask him for help.

@@ -1,0 +1,23 @@
+---
+title: 'Prime Configuration'
+description: 'Setup guide for the Prime MCP Server'
+---
+
+Prime is a custom MCP server that serves dbt project context (manifest files) to Claude, ensuring AI understands our specific data model.
+
+## Overview
+
+Prime acts as a bridge between your dbt project's metadata and your AI assistant. By indexing the `manifest.json` file, it allows Claude to understand:
+*   Table schemas and column descriptions.
+*   Metric definitions.
+*   Lineage relationships between models.
+
+## Admin Setup
+
+(Coming soon: Instructions for deploying Prime to a new environment).
+
+## User Setup (Claude.ai)
+
+1.  **Locate the Prime URL**: Ask your admin for the internal URL where Prime is hosted (currently http://prime-f15k.onrender.com/).
+2.  **Configure Claude**: Navigate to **Settings** > **Connectors** > **Add custom connector**. Call it Prime. Just enter the URL (no Oauth at this stage)
+3.  **Verify**: Ask "Using Prime, tell me which metrics exist in our warehouse"

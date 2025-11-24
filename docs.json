@@ -27,8 +27,15 @@
           {
             "group": "Introduction",
             "pages": [
-              "analytics-stack/overview",
-              "analytics-stack/configuration"
+              "analytics-stack/overview"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "analytics-stack/configuration/snowflake-mcp",
+              "analytics-stack/configuration/cursor",
+              "analytics-stack/configuration/prime"
             ]
           },
           {
@@ -50,10 +57,18 @@
             ]
           },
           {
-            "group": "Gold Layer Tables",
+            "group": "Understanding the Data",
             "pages": [
-              "fiber-map/usa-all-periods-final",
-              "fiber-map/usa-location-summary"
+              "fiber-map/data-model",
+              "fiber-map/key-metrics",
+              "fiber-map/calculations"
+            ]
+          },
+          {
+            "group": "Data Dictionary",
+            "pages": [
+              "fiber-map/data-dictionary/gold-tables",
+              "fiber-map/data-dictionary/clean-tables"
             ]
           },
           {
