@@ -1,35 +1,235 @@
 ---
-title: "Gold Layer Tables"
-description: "Detailed field documentation for analysis-ready Gold tables"
+title: "usa_all_periods_final"
+description: "Detailed location-level broadband availability data"
 icon: "table"
 ---
 
 ## Overview
 
-The Gold layer contains analysis-ready tables optimized for business users. These tables are denormalized with all necessary context for easy querying.
+**Fully Qualified Name**: `FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL`
 
-**Database**: `FIBER_MAP`  
-**Schema**: `DBT_GOLD`
+**Purpose**: Detailed location-level broadband availability data with full provider, technology, and speed information.
+
+**Grain**: One row per combination of:
+- Location ID
+- Provider Brand + FRN
+- Technology Type
+- Time Period
+- Business/Residential Code
+- Advertised Speeds
+
+**Typical Row Count**: ~50 million records (Indiana 2% sample)
+
+## When to Use This Table
+
+<CardGroup cols={2}>
+  <Card title="Speed Analysis" icon="gauge-high">
+    Analyze download and upload speeds across providers and technologies
+  </Card>
+  
+  <Card title="DOCSIS Tracking" icon="signal-stream">
+    Track cable technology versions and upgrades (DOCSIS 2.0/3.0/3.1/4.0)
+  </Card>
+  
+  <Card title="Build-Out Timeline" icon="calendar-check">
+    Monitor when providers first deployed services in markets
+  </Card>
+  
+  <Card title="Business vs Residential" icon="building">
+    Analyze service availability by customer type
+  </Card>
+</CardGroup>
+
+Use **usa_location_summary** instead when you only need location counts without speed details.
 
 ---
 
-## usa_all_periods_final
+## Key Metrics
 
-**Fully Qualified Name**: `FIBER_MAP.DBT_GOLD.USA_ALL_PERIODS_FINAL`
+### Number of Locations
 
-**Description**: Full detail broadband availability data with provider, technology, speed, and geographic information for each location and time period.
+**Metric Name**: `NUMBER_OF_LOCATIONS`
 
-**Grain**: One row per unique combination of:
-- Location ID
-- Brand + FRN (provider)
-- Technology Type
-- Time Period
-- Business/Residential Code  
-- Advertised Speeds
+**Definition**: Distinct count of broadband service locations
 
-**Row Count**: ~50 million records (Indiana 2% sample)
+**Calculation**: `COUNT_DISTINCT(LOCATION_ID)`
 
-**Best For**: Speed analysis, DOCSIS tracking, build-out timelines, census block geography, business vs. residential analysis
+**Business Context**
+
+This is the fundamental metric for market sizing and coverage analysis. It answers questions like:
+- How many locations does Provider X serve?
+- What's the size of the addressable market in County Y?
+- How many locations have fiber service available?
+
+<Warning>
+Always use `COUNT(DISTINCT LOCATION_ID)` rather than `COUNT(*)` when counting locations. A single location may have multiple rows due to different providers, technologies, or service types.
+</Warning>
+
+### Percent of Locations
+
+**Metric Name**: `PERCENT_OF_LOCATIONS`
+
+**Definition**: Percentage of total locations in the dataset
+
+**Calculation**: `(Location count / Total locations) * 100`
+
+---
+
+## Calculated Fields & Logic
+
+### Technology Code Mapping
+
+**Field**: `TECHNOLOGY_NAME`  
+**Source**: `TECHNOLOGY` (numeric code)
+
+The dataset converts numeric technology codes into human-readable names:
+
+| Numeric Code | Technology Name | Description |
+|--------------|-----------------|-------------|
+| 10 | Copper | DSL (Digital Subscriber Line) over phone lines |
+| 40 | Cable | Cable modem via TV cable infrastructure |
+| 50 | Fiber to the Premises | Direct fiber optic connection to building |
+| 60 | GSO Satellite | Geostationary orbit satellite (traditional satellite) |
+| 61 | NGSO Satellite | Non-geostationary orbit satellite (e.g., Starlink, OneWeb) |
+| 70 | Unlicensed Fixed Wireless | Fixed wireless using unlicensed spectrum (e.g., Wi-Fi frequencies) |
+| 71 | Licensed Fixed Wireless | Fixed wireless using licensed spectrum (e.g., cellular bands) |
+| 72 | LBR Fixed Wireless | Low-Band Radio fixed wireless |
+| 0 | Other | Other or unknown technologies |
+
+**SQL Logic**:
+
+```sql
+CASE 
+    WHEN TECHNOLOGY = 10 THEN 'Copper'
+    WHEN TECHNOLOGY = 40 THEN 'Cable'
+    WHEN TECHNOLOGY = 50 THEN 'Fiber to the Premises'
+    WHEN TECHNOLOGY = 60 THEN 'GSO Satellite'
+    WHEN TECHNOLOGY = 61 THEN 'NGSO Satellite'
+    WHEN TECHNOLOGY = 70 THEN 'Unlicensed Fixed Wireless'
+    WHEN TECHNOLOGY = 71 THEN 'Licensed Fixed Wireless'
+    WHEN TECHNOLOGY = 72 THEN 'LBR Fixed Wireless'
+    WHEN TECHNOLOGY = 0 THEN 'Other'
+    ELSE 'Unknown'
+END AS TECHNOLOGY_NAME
+```
+
+**Business Context**: These technology types represent fundamentally different approaches to delivering broadband with varying capacity, costs, and capabilities.
+
+### DOCSIS Classification Logic
+
+**Field**: `DOCSIS_CLASS`  
+**Source**: `MAX_ADVERTISED_DOWNLOAD_SPEED` and `MAX_ADVERTISED_UPLOAD_SPEED`  
+**Applies to**: Cable providers only (TECHNOLOGY = 40)
+
+| DOCSIS Version | Download Speed | Upload Speed | Description |
+|----------------|----------------|--------------|-------------|
+| **4.0** | > 1000 Mbps | > 1000 Mbps | Symmetrical multi-gigabit (both down & up > 1 Gbps) |
+| **3.1** | > 800 Mbps | Any | High-speed asymmetrical (down > 800 Mbps) |
+| **2.0/3.0** | ≤ 800 Mbps | Any | Standard cable speeds |
+
+**SQL Logic**:
+
+```sql
+CASE 
+    WHEN MAX_ADVERTISED_DOWNLOAD_SPEED > 1000 
+        AND MAX_ADVERTISED_UPLOAD_SPEED > 1000 
+        THEN '4.0'
+    WHEN MAX_ADVERTISED_DOWNLOAD_SPEED > 800 
+        THEN '3.1'
+    ELSE '2.0/3.0'
+END AS DOCSIS_CLASS
+```
+
+**Business Context**: DOCSIS (Data Over Cable Service Interface Specification) defines how cable companies deliver internet. Newer versions support higher speeds, with DOCSIS 4.0 competing directly with fiber.
+
+<Note>
+`DOCSIS_CLASS` is NULL for all non-cable technologies (fiber, wireless, satellite, etc.). This is expected - DOCSIS only applies to cable.
+</Note>
+
+### BUILD_DATE Calculation
+
+**Field**: `BUILD_DATE`  
+**Source**: `TIME_PERIOD_DATE`  
+**Purpose**: Identify when a provider first started offering a specific technology at each location
+
+**SQL Logic**:
+
+```sql
+MIN(TO_DATE(TIME_PERIOD, 'MMMM YYYY')) OVER (
+    PARTITION BY LOCATION_ID, BRAND_NAME, TECHNOLOGY
+) AS BUILD_DATE
+```
+
+**How It Works**: For each unique combination of Location + Provider + Technology, finds the **earliest TIME_PERIOD_DATE** when that combination first appears.
+
+**Example**:
+
+| LOCATION_ID | BRAND_NAME | TECHNOLOGY | TIME_PERIOD | BUILD_DATE |
+|-------------|------------|------------|-------------|------------|
+| 12345 | Comcast | 40 (Cable) | June 2022 | **2022-06-01** |
+| 12345 | Comcast | 40 (Cable) | December 2022 | **2022-06-01** |
+| 12345 | Comcast | 50 (Fiber) | December 2023 | **2023-12-01** |
+| 12345 | AT&T | 50 (Fiber) | June 2022 | **2022-06-01** |
+
+**Use Cases**:
+- Track service expansion and market entry timing
+- Identify recent builds by filtering on BUILD_DATE
+- Analyze build-out velocity over time
+
+<Warning>
+**BUILD_DATE represents when the service first appeared in FCC reporting data, not necessarily the actual construction date.**
+
+- Data collection started in June 2022, so no BUILD_DATE can be earlier than 2022-06-01
+- If a provider served a location before June 2022, BUILD_DATE will show 2022-06-01
+- There can be a lag between actual construction and FCC reporting
+</Warning>
+
+### TIME_PERIOD_DATE Conversion
+
+**Field**: `TIME_PERIOD_DATE`  
+**Source**: `TIME_PERIOD` (text string)  
+**Purpose**: Convert human-readable time periods into dates for time-series analysis
+
+```sql
+TO_DATE(TIME_PERIOD, 'MMMM YYYY') AS TIME_PERIOD_DATE
+```
+
+| TIME_PERIOD (Input) | TIME_PERIOD_DATE (Output) |
+|---------------------|---------------------------|
+| June 2022 | 2022-06-01 |
+| December 2022 | 2022-12-01 |
+| June 2023 | 2023-06-01 |
+| December 2023 | 2023-12-01 |
+
+**Result**: Always the **first day of the month**
+
+### Primary Key Generation
+
+**Field**: `PRIMARY_KEY`  
+**Purpose**: Create a unique identifier for each row using composite business keys
+
+```sql
+MD5(
+    COALESCE(CAST(LOCATION_ID AS VARCHAR), '') || '|' ||
+    COALESCE(BRAND_NAME, '') || '|' ||
+    COALESCE(TIME_PERIOD, '') || '|' ||
+    COALESCE(FRN, '') || '|' ||
+    COALESCE(CAST(TECHNOLOGY AS VARCHAR), '') || '|' ||
+    COALESCE(BUSINESS_RESIDENTIAL_CODE, '') || '|' ||
+    COALESCE(CAST(MAX_ADVERTISED_DOWNLOAD_SPEED AS VARCHAR), '') || '|' ||
+    COALESCE(CAST(MAX_ADVERTISED_UPLOAD_SPEED AS VARCHAR), '')
+) AS PRIMARY_KEY
+```
+
+Creates a fixed-length (32 character) unique identifier that's deterministic and handles NULL values safely.
+
+<Info>
+For most business analysis, you'll filter and group by the human-readable dimension fields (BRAND_NAME, TECHNOLOGY_NAME, etc.) rather than PRIMARY_KEY.
+</Info>
+
+---
+
+## Field Reference
 
 ### Dimensions
 
@@ -42,8 +242,6 @@ The Gold layer contains analysis-ready tables optimized for business users. Thes
     **Composition**: MD5 hash of LOCATION_ID + BRAND_NAME + TIME_PERIOD + FRN + TECHNOLOGY + BUSINESS_RESIDENTIAL_CODE + speeds
     
     **Usage**: Ensure uniqueness in joins, identify duplicate records
-    
-    **Note**: This is a technical field. For business analysis, use the human-readable dimension fields instead.
   </Accordion>
   
   <Accordion title="BRAND_NAME" icon="tag">
@@ -260,8 +458,6 @@ The Gold layer contains analysis-ready tables optimized for business users. Thes
     **Usage**: Build-out timeline analysis, track when providers entered markets, identify recent expansions
     
     **Business Context**: Represents when service first appeared in FCC data, which may not be the exact construction date
-    
-    **Example**: If a location shows BUILD_DATE = 2023-06-01, the provider first reported serving that location with that technology in June 2023
   </Accordion>
   
   <Accordion title="DOCSIS_CLASS" icon="signal-stream">
@@ -393,125 +589,22 @@ The Gold layer contains analysis-ready tables optimized for business users. Thes
   </Accordion>
 </AccordionGroup>
 
-### Analysis in Lightdash
-
-Use this table when you need detailed attributes like speeds, DOCSIS class, business/residential codes, or build dates. Group by provider and technology dimensions, and use the pre-configured `NUMBER_OF_LOCATIONS` metric.
-
 ---
 
-## usa_location_summary
+## Analysis in Lightdash
 
-**Fully Qualified Name**: `FIBER_MAP.DBT_GOLD.USA_LOCATION_SUMMARY`
+Use this table when you need:
+- Detailed attributes like speeds, DOCSIS class, or business/residential codes
+- Build date tracking for expansion analysis
+- Census block-level geographic detail
 
-**Description**: Aggregated summary of broadband availability optimized for location counting and market share analysis. Includes synthetic "All" technology rows for dashboard filtering.
-
-**Grain**: One row per unique combination of:
-- Time Period
-- Brand Name
-- Technology Name (including synthetic "All" values)
-- Location ID
-
-**Row Count**: ~5-10 million records (Indiana 2% sample)
-
-**Best For**: Location counts, market share, provider footprint, Lightdash dashboards
-
-### Dimensions
-
-<AccordionGroup>
-  <Accordion title="PRIMARY_KEY" icon="key">
-    **Type**: String (MD5 hash)
-    
-    **Description**: Unique identifier for each record
-    
-    **Composition**: MD5 hash of TIME_PERIOD + BRAND_NAME + TECHNOLOGY_NAME + LOCATION_ID
-    
-    **Usage**: Ensure uniqueness, join to other tables
-  </Accordion>
-  
-  <Accordion title="TIME_PERIOD" icon="calendar">
-    **Type**: String
-    
-    **Description**: Time period of the data snapshot
-    
-    **Available Values**:
-    - June 2022
-    - December 2022
-    - June 2023
-    - December 2023
-    - June 2024
-    - December 2024
-    
-    **Usage**: Filter and group by time period
-  </Accordion>
-  
-  <Accordion title="TIME_PERIOD_DATE" icon="calendar-days">
-    **Type**: Date
-    
-    **Description**: Time period as a date (first day of month)
-    
-    **Format**: YYYY-MM-DD
-    
-    **Usage**: Date-based filtering and time-series analysis
-  </Accordion>
-  
-  <Accordion title="BRAND_NAME" icon="tag">
-    **Type**: String
-    
-    **Description**: Provider brand name
-    
-    **Top Values**: Same as usa_all_periods_final (Comcast, AT&T, Verizon, etc.)
-    
-    **Usage**: Provider analysis and filtering
-  </Accordion>
-  
-  <Accordion title="TECHNOLOGY_NAME" icon="signal">
-    **Type**: String
-    
-    **Description**: Technology type name
-    
-    **Values**: 
-    - All standard technology names (Cable, Fiber to the Premises, etc.)
-    - **"All"** - Synthetic value for parameter filtering
-    
-    **Important**: This table includes synthetic rows where TECHNOLOGY_NAME = 'All' to support Lightdash parameter-driven filtering. When joining to other tables, filter these out: `WHERE TECHNOLOGY_NAME != 'All'`
-    
-    **Usage**: Technology filtering and grouping
-  </Accordion>
-  
-  <Accordion title="LOCATION_ID" icon="location-dot">
-    **Type**: Number
-    
-    **Description**: Unique location identifier
-    
-    **Usage**: Count distinct locations for market sizing
-    
-    **Metric**: NUMBER_OF_LOCATIONS = COUNT_DISTINCT(LOCATION_ID)
-  </Accordion>
-</AccordionGroup>
-
-### Synthetic "All" Technology Rows
-
-This table includes special rows where `TECHNOLOGY_NAME = 'All'` for each location, brand, and time period combination. These rows enable Lightdash dashboards to show "all technologies" as a filter option without creating duplicate counts.
-
-**When to exclude**: Filter out `TECHNOLOGY_NAME = 'All'` when you need actual technology breakdowns or when joining to other tables.
-
-**When to keep**: When building Lightdash dashboards that use technology as a parameter filter.
-
-### Analysis in Lightdash
-
-Use this table for fast location counting and market share analysis. It's optimized for performance and works best with the `NUMBER_OF_LOCATIONS` and `PERCENT_OF_LOCATIONS` metrics.
+Group by provider and technology dimensions, and use the pre-configured `NUMBER_OF_LOCATIONS` metric.
 
 ---
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Clean Layer Tables" icon="database" href="/fiber-map/data-dictionary/clean-tables">
-    Reference documentation for source data
-  </Card>
-  
-  <Card title="Calculations & Logic" icon="function" href="/fiber-map/calculations">
-    Understand how fields are calculated
-  </Card>
-</CardGroup>
+<Card title="usa_location_summary" icon="table" href="/fiber-map/usa-location-summary">
+  View the simplified aggregated table for faster location counting
+</Card>
 

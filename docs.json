@@ -50,18 +50,10 @@
             ]
           },
           {
-            "group": "Understanding the Data",
+            "group": "Gold Layer Tables",
             "pages": [
-              "fiber-map/data-model",
-              "fiber-map/key-metrics",
-              "fiber-map/calculations"
-            ]
-          },
-          {
-            "group": "Data Dictionary",
-            "pages": [
-              "fiber-map/data-dictionary/gold-tables",
-              "fiber-map/data-dictionary/clean-tables"
+              "fiber-map/usa-all-periods-final",
+              "fiber-map/usa-location-summary"
             ]
           },
           {
