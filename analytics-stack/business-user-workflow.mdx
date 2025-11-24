@@ -1,0 +1,34 @@
+---
+title: 'Business User Workflow'
+description: 'Self-serve analysis with Lightdash and Claude'
+---
+
+Business users can access data through trusted dashboards or ask questions in natural language.
+
+## Method 1: Trusted Dashboards (Lightdash)
+
+Use **Lightdash** for standard, recurring reporting.
+
+1.  Navigate to the Lightdash portal.
+2.  Browse "Saved Charts" or "Dashboards" for verified metrics.
+3.  Use filters to slice data by date, region, or product.
+4.  **Drill down**: Click on data points to inspect underlying records.
+
+## Method 2: Ad-Hoc Analysis (Claude.ai)
+
+Use **Claude** for one-off questions or exploring data not yet in a dashboard.
+
+### Setup
+Ensure you have the **Snowflake MCP** integration enabled in your Claude interface.
+
+### Querying Data
+1.  **Ask a Question**: "Show me the trend of active fiber subscribers for the last 6 months by region."
+2.  **Verify Context**: Claude uses the Snowflake MCP to check the schema. It may ask for clarification on which table to use (e.g., `GOLD_SUBSCRIPTIONS`).
+3.  **Get Results**: Claude generates the SQL, runs it against Snowflake, and presents the answer (chart or table).
+4.  **Iterate**: "Now break this down by acquisition channel."
+
+### Best Practices
+*   Be specific about time ranges.
+*   Reference specific business entities (e.g., "Customers", "Invoices") to help Claude find the right tables.
+*   Cross-reference critical numbers with Lightdash dashboards.
+

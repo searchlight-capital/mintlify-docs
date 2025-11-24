@@ -1,0 +1,34 @@
+---
+title: 'Developer Workflow'
+description: 'Building pipelines with Cursor and AI'
+---
+
+This workflow enables rapid development of dbt models using AI assistance.
+
+## Prerequisites
+
+*   Cursor IDE installed.
+*   Access to the `fiber_map_dbt` repository.
+*   Snowflake credentials configured.
+*   **Prime** and **Snowflake** MCP servers enabled in Cursor.
+
+## Development Process
+
+### 1. Explore & Plan
+Use **Cursor's Chat** to understand the data.
+*   Ask generic questions about the codebase (Prime provides context).
+*   Sample data using the Snowflake MCP to verify assumptions.
+
+### 2. Build dbt Models
+Leverage Cursor to write SQL and YAML.
+*   **Generate SQL**: Describe the transformation you need. Cursor uses your dbt context to suggest correct table references and join logic.
+*   **Auto-document**: specific columns or tables using AI generation, adhering to our naming conventions (e.g., `UPPERCASE_UNDERSCORED`).
+
+### 3. Test & Validate
+*   Run `dbt run` and `dbt test` within the Cursor terminal.
+*   Use the **Snowflake MCP** to run ad-hoc checks on the created tables to ensure data quality (e.g., `SELECT * FROM new_model LIMIT 10`).
+
+### 4. Deploy
+*   Commit changes to version control.
+*   CI/CD pipelines handle the production deployment.
+

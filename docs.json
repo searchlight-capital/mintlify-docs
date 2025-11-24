@@ -22,6 +22,25 @@
         ]
       },
       {
+        "tab": "Analytics Stack",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": [
+              "analytics-stack/overview",
+              "analytics-stack/configuration"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "analytics-stack/developer-workflow",
+              "analytics-stack/business-user-workflow"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Fiber Map",
         "groups": [
           {
