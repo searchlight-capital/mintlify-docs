@@ -1,0 +1,228 @@
+---
+title: 'Analytics Developer Setup'
+description: 'Set up your development environment to build data pipelines, metrics, and dashboards'
+---
+
+As an analytics developer, you'll build data pipelines with dbt, create semantic metrics, develop dashboards in Lightdash, and use AI-powered tools to accelerate development.
+
+## Prerequisites
+
+- Snowflake account with developer role access
+- Claude.ai account (Pro recommended)
+- GitHub account with access to the Searchlight enterprise repos
+- Cursor IDE license (Pro or Business)
+
+## 1. Complete Business User Setup
+
+First, complete the [Business User Setup](/analytics-stack/getting-started/business-user) to configure:
+- Snowflake MCP in Claude
+- Prime MCP in Claude
+- Lightdash access
+
+This gives you the foundation for AI-powered data analysis.
+
+## 2. Install Cursor IDE
+
+### 2.1 Download and Install
+
+1. Download [Cursor](https://cursor.sh/)
+2. Install the application
+3. Launch Cursor and sign in with your license
+
+### 2.2 Configure Snowflake MCP for Cursor
+
+1. Go to **Cursor Settings** > **Features** > **MCP**
+2. Add a new **STDIO** MCP server
+3. Configure the Snowflake connector:
+
+<Note>
+Consult your engineering team for the specific Docker or local Java command to run the Snowflake JDBC/MCP connector.
+</Note>
+
+**Environment Variables:**
+```
+SNOWFLAKE_ACCOUNT=zh06779.north-europe.azure
+SNOWFLAKE_USER=YOUR_USERNAME
+SNOWFLAKE_ROLE=SYSADMIN
+SNOWFLAKE_WAREHOUSE=COMPUTE_WH
+SNOWFLAKE_AUTHENTICATOR=externalbrowser
+```
+
+### 2.3 Configure Prime MCP and Snowflake MCP for Cursor
+
+COMING SOON
+
+### 2.4 Download Searchlight's gold standard cursor-rules files
+From the Git repo
+
+### 2.5 Install Recommended Extensions
+
+Install these extensions for optimal dbt development:
+- **dbt**: Official dbt VSCode extension for syntax highlighting and validation
+- **Better Jinja**: Syntax highlighting and snippets for Jinja templates in dbt models
+- **YAML**: For editing dbt configuration files
+
+## 3. Clone GitHub Repositories
+
+### 3.1 Set Up GitHub Access
+
+1. Ensure you have access to the Searchlight Capital organization
+2. Sign in to GitHub within Cursor
+3. Install GitHub Desktop
+
+### 3.2 Clone Project Repositories
+
+Clone the relevant repositories:
+1. The dbt project you are working on 
+
+## 4. Install and Configure dbt
+
+### 4.1 Install dbt Core
+
+```bash
+pip install dbt-snowflake
+```
+
+### 4.2 Configure Your Profile
+
+Create/edit `~/.dbt/profiles.yml`:
+
+```yaml
+fiber_map:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: zh06779.north-europe.azure
+      user: YOUR_USERNAME
+      authenticator: externalbrowser
+      role: SYSADMIN
+      warehouse: COMPUTE_WH
+      database: FIBER_MAP
+      schema: DBT_YOUR_NAME_DEV
+      threads: 4
+```
+
+### 4.3 Verify Connection
+
+```bash
+cd fiber_map_dbt  # or your project directory
+dbt debug
+```
+
+You should see successful connection messages.
+
+### 4.4 Test a Model Run
+
+```bash
+dbt run --select stg_customers
+```
+
+## 5. Access Braintrust
+
+### 5.1 Request Access
+
+Contact your admin to be added to the Braintrust workspace.
+
+### 5.2 Set Up API Key
+
+1. Log in to [Braintrust](https://www.braintrustdata.com/)
+2. Navigate to **Settings** > **API Keys**
+3. Create a new API key
+4. Save it to your environment:
+
+```bash
+export BRAINTRUST_API_KEY=YOUR_API_KEY
+```
+
+### 5.3 Test Connection
+
+Run a sample evaluation from the `analytics-evals` repository:
+
+```bash
+cd analytics-evals
+python run_eval.py --test-name sample
+```
+
+## 6. Set Up Mintlify (for Documentation)
+
+### 6.1 Install Mintlify CLI
+
+```bash
+npm install -g mintlify
+```
+
+### 6.2 Run Documentation Locally
+
+```bash
+cd mintlify-docs
+mintlify dev
+```
+
+Open `http://localhost:3000` to preview documentation.
+
+### 6.3 Make Changes
+
+Edit `.mdx` files in the repository and see changes live in your browser.
+
+## 7. Verify Complete Setup
+
+Test all components:
+
+**dbt + Snowflake:**
+```bash
+dbt run --select stg_customers
+dbt test
+```
+
+**Cursor AI:**
+- Open a dbt model in Cursor
+- Ask the AI: *"Explain what this model does"*
+- Try: *"Generate a staging model for the raw.orders table"*
+
+**Claude.ai:**
+- Ask: *"Using Prime, how many locations does Mainstream serve?"*
+
+**Lightdash:**
+- Create a test chart from a dbt model
+- Save it to your personal space
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Developer Workflow"
+    icon="code"
+    href="/analytics-stack/developer-workflow"
+  >
+    Learn best practices for building pipelines and collaborating
+  </Card>
+  <Card
+    title="Cursor Rules"
+    icon="file-code"
+    href="https://github.com/searchlight-capital/cursor-rules"
+  >
+    Review shared coding standards and AI prompts
+  </Card>
+  <Card
+    title="dbt Best Practices"
+    icon="database"
+    href="/analytics-stack/dbt-best-practices"
+  >
+    Follow our data modeling guidelines
+  </Card>
+  <Card
+    title="Lightdash Charts"
+    icon="chart-line"
+    href="/analytics-stack/lightdash-charts"
+  >
+    Learn how to build effective visualizations
+  </Card>
+</CardGroup>
+
+## Additional docs
+
+- **Snowflake MCP**: [Snowflake docs](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-mcp)
+- **dbt**: Check [dbt documentation](https://docs.getdbt.com/) and [VSCode extension](https://docs.getdbt.com/docs/install-dbt-extension)
+- **Cursor**: Visit [Cursor documentation](https://docs.cursor.sh/)
+- **Braintrust**: [Braintrust docs](https://www.braintrust.dev/docs)
