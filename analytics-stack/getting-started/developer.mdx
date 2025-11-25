@@ -83,7 +83,20 @@ Clone the relevant repositories:
 pip install dbt-snowflake
 ```
 
-### 4.2 Configure Your Profile
+### 4.2 Set Up Snowflake Private Key Authentication
+
+<Note>
+If you don't already have a Snowflake private key, you'll need to generate one and register it with Snowflake.
+</Note>
+
+**Generate a Private Key Pair:**
+See [Snowflake docs](https://docs.snowflake.com/en/user-guide/key-pair-auth#generate-the-private-keys)
+
+<Warning>
+Never commit your private key to version control. Add `*.p8` and `*.pem` to your `.gitignore`.
+</Warning>
+
+### 4.3 Configure Your Profile
 
 Create/edit `~/.dbt/profiles.yml`:
 
@@ -95,15 +108,19 @@ fiber_map:
       type: snowflake
       account: zh06779.north-europe.azure
       user: YOUR_USERNAME
-      authenticator: externalbrowser
-      role: SYSADMIN
-      warehouse: COMPUTE_WH
+      authenticator: snowflake_jwt
+      private_key_path: /Users/YOUR_HOME/.ssh/snowflake_rsa_key.p8
+      warehouse: WAREHOUSE_NAME
       database: FIBER_MAP
       schema: DBT_YOUR_NAME_DEV
       threads: 4
 ```
 
-### 4.3 Verify Connection
+<Tip>
+Replace `/Users/YOUR_HOME/` with your actual home directory path. On Windows, use: `C:\Users\YOUR_USERNAME\.ssh\snowflake_rsa_key.p8`
+</Tip>
+
+### 4.4 Verify Connection
 
 ```bash
 cd fiber_map_dbt  # or your project directory
@@ -112,10 +129,10 @@ dbt debug
 
 You should see successful connection messages.
 
-### 4.4 Test a Model Run
+### 4.5 Test a Model Run
 
 ```bash
-dbt run --select stg_customers
+dbt run
 ```
 
 ## 5. Access Braintrust
@@ -129,20 +146,7 @@ Contact your admin to be added to the Braintrust workspace.
 1. Log in to [Braintrust](https://www.braintrustdata.com/)
 2. Navigate to **Settings** > **API Keys**
 3. Create a new API key
-4. Save it to your environment:
-
-```bash
-export BRAINTRUST_API_KEY=YOUR_API_KEY
-```
-
-### 5.3 Test Connection
-
-Run a sample evaluation from the `analytics-evals` repository:
-
-```bash
-cd analytics-evals
-python run_eval.py --test-name sample
-```
+4. Use this in Braintrust.
 
 ## 6. Set Up Mintlify (for Documentation)
 
