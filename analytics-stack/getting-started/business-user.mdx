@@ -5,6 +5,41 @@ description: 'Configure AI-powered analysis tools to query data directly'
 
 As a business user, you'll set up Claude.ai to query Snowflake data and understand your dbt semantic layer, plus gain access to Lightdash for dashboard exploration.
 
+## How the Systems Connect
+
+```mermaid
+graph TB
+    User[Business User]
+    Claude[Claude.ai]
+    Lightdash[Lightdash<br/>Dashboards]
+    Mintlify[Mintlify Docs]
+    Snowflake[(Snowflake<br/>Data Warehouse)]
+    Prime[Prime MCP<br/>Data Catalog]
+    
+    User -->|Asks questions| Claude
+    User -->|Views dashboards| Lightdash
+    User -->|References setup| Mintlify
+    
+    Claude -->|Queries via MCP| Snowflake
+    Claude -->|Gets context from| Prime
+    
+    Lightdash -->|Queries| Snowflake
+    
+    style User fill:#e1f5ff
+    style Claude fill:#f9f5ff
+    style Snowflake fill:#e8f4f8
+    style Prime fill:#fff4e6
+    style Lightdash fill:#e8f5e9
+    style Mintlify fill:#fce4ec
+```
+
+**What each system does:**
+- **Snowflake**: Your data warehouse where all business data is stored
+- **Claude.ai**: AI assistant that queries data via the Snowflake MCP connector and uses Prime for semantic context
+- **Prime MCP**: Data catalog that provides Claude with information about your dbt models, metrics, and lineage
+- **Lightdash**: Dashboard platform for exploring pre-built visualizations and creating custom charts
+- **Mintlify**: Documentation hub for setup guides and reference materials
+
 ## Prerequisites
 
 - Snowflake account with MCP role access
@@ -70,7 +105,18 @@ Claude should now understand your dbt semantic layer, including:
 - Metric definitions
 - Lineage relationships between models
 
-## 4. Access Lightdash
+## 4. Configure Claude Personal Preferences
+
+Optimize Claude's behavior for data analysis by adding a personal preference that instructs it to be more transparent about calculations and assumptions.
+
+1. In Claude.ai, go to **Settings** > **General** > **Custom instructions**
+2. Add the following personal preference:
+
+```
+When building analysis with SQL, explain in natural language the calculation logic you used and any risky assumptions you have made.
+```
+
+## 5. Access Lightdash
 
 1. Navigate to your organization's Lightdash URL (provided by admin)
 2. Sign in using your credentials
@@ -81,7 +127,7 @@ Lightdash provides:
 - Self-service exploration of your data models
 - Integration with your dbt semantic layer
 
-## 5. Test Your Setup
+## 6. Test Your Setup
 
 Now that everything is configured, test your access:
 

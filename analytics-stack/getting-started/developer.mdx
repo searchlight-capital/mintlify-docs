@@ -5,6 +5,10 @@ description: 'Set up your development environment to build data pipelines, metri
 
 As an analytics developer, you'll build data pipelines with dbt, create semantic metrics, develop dashboards in Lightdash, and use AI-powered tools to accelerate development.
 
+<Note>
+This guide is for developers joining an **existing analytics project**. If you're setting up a new project from scratch, see the [Admin Setup Guide](/analytics-stack/getting-started/admin).
+</Note>
+
 ## Prerequisites
 
 - Snowflake account with developer role access
@@ -29,33 +33,11 @@ This gives you the foundation for AI-powered data analysis.
 2. Install the application
 3. Launch Cursor and sign in with your license
 
-### 2.2 Configure Snowflake MCP for Cursor
-
-1. Go to **Cursor Settings** > **Features** > **MCP**
-2. Add a new **STDIO** MCP server
-3. Configure the Snowflake connector:
-
-<Note>
-Consult your engineering team for the specific Docker or local Java command to run the Snowflake JDBC/MCP connector.
-</Note>
-
-**Environment Variables:**
-```
-SNOWFLAKE_ACCOUNT=zh06779.north-europe.azure
-SNOWFLAKE_USER=YOUR_USERNAME
-SNOWFLAKE_ROLE=SYSADMIN
-SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-SNOWFLAKE_AUTHENTICATOR=externalbrowser
-```
-
 ### 2.3 Configure Prime MCP and Snowflake MCP for Cursor
 
 COMING SOON
 
-### 2.4 Download Searchlight's gold standard cursor-rules files
-From the Git repo
-
-### 2.5 Install Recommended Extensions
+### 2.4 Install Recommended Extensions
 
 Install these extensions for optimal dbt development:
 - **dbt**: Official dbt VSCode extension for syntax highlighting and validation
@@ -73,30 +55,26 @@ Install these extensions for optimal dbt development:
 ### 3.2 Clone Project Repositories
 
 Clone the relevant repositories:
-1. The dbt project you are working on 
+1. The dbt project you are working on (e.g., `fiber_map_dbt`)
+2. The [`analytics-evals`](https://github.com/searchlight-capital/analytics-evals) repository for running evaluation tests
+3. The [`mintlify-docs`](https://github.com/searchlight-capital/mintlify-docs) repository for editing documentation 
 
 ## 4. Install and Configure dbt
 
-### 4.1 Install dbt Core
+Follow the basic setup steps for [dbt Core](https://docs.getdbt.com/docs/about-setup) 
 
-```bash
-pip install dbt-snowflake
-```
-
-### 4.2 Set Up Snowflake Private Key Authentication
+### 4.1 Set Up Snowflake Private Key Authentication
 
 <Note>
-If you don't already have a Snowflake private key, you'll need to generate one and register it with Snowflake.
-</Note>
-
-**Generate a Private Key Pair:**
+If you don't already have a Snowflake private key, you'll need to generate one and register it with Snowflake. 
 See [Snowflake docs](https://docs.snowflake.com/en/user-guide/key-pair-auth#generate-the-private-keys)
+</Note>
 
 <Warning>
 Never commit your private key to version control. Add `*.p8` and `*.pem` to your `.gitignore`.
 </Warning>
 
-### 4.3 Configure Your Profile
+### 4.2 Configure Your Profile
 
 Create/edit `~/.dbt/profiles.yml`:
 
@@ -120,7 +98,7 @@ fiber_map:
 Replace `/Users/YOUR_HOME/` with your actual home directory path. On Windows, use: `C:\Users\YOUR_USERNAME\.ssh\snowflake_rsa_key.p8`
 </Tip>
 
-### 4.4 Verify Connection
+### 4.3 Verify Connection
 
 ```bash
 cd fiber_map_dbt  # or your project directory
@@ -129,34 +107,67 @@ dbt debug
 
 You should see successful connection messages.
 
-### 4.5 Test a Model Run
-
+Test a model run
 ```bash
 dbt run
 ```
 
-## 5. Access Braintrust
+## 5. Install Lightdash CLI
 
-### 5.1 Request Access
+The Lightdash CLI allows you to develop and deploy charts and dashboards as code.
+
+Full documentation on how the [Lightdash CLI](https://docs.lightdash.com/references/lightdash-cli#lightdash-cli-reference)
+
+### 5.1 Authenticate with Lightdash
+
+```bash
+lightdash login https://app.lightdash.cloud
+```
+
+You'll be prompted to authenticate via your browser. Once authenticated, the CLI will save your credentials.
+
+<Tip>
+For detailed workflows on using the Lightdash CLI and building the semantic layer, see the [Developer Workflow guide](/analytics-stack/developer-workflow).
+</Tip>
+
+## 6. Access Braintrust
+
+### 6.1 Request Access
 
 Contact your admin to be added to the Braintrust workspace.
 
-### 5.2 Set Up API Key
+### 6.2 Set Up API Key
 
 1. Log in to [Braintrust](https://www.braintrustdata.com/)
 2. Navigate to **Settings** > **API Keys**
 3. Create a new API key
-4. Use this in Braintrust.
+4. Add the API key to your environment:
 
-## 6. Set Up Mintlify (for Documentation)
+```bash
+export BRAINTRUST_API_KEY=YOUR_API_KEY
+```
 
-### 6.1 Install Mintlify CLI
+### 6.3 Test Running Evaluations
+
+Verify you can run evaluations from the `analytics-evals` repository:
+
+```bash
+cd analytics-evals
+npm install
+npm run eval
+```
+
+You should see the evaluation results appear in your Braintrust dashboard.
+
+## 7. Set Up Mintlify (for Documentation)
+
+### 7.1 Install Mintlify CLI
 
 ```bash
 npm install -g mintlify
 ```
 
-### 6.2 Run Documentation Locally
+### 7.2 Run Documentation Locally
 
 ```bash
 cd mintlify-docs
@@ -165,11 +176,11 @@ mintlify dev
 
 Open `http://localhost:3000` to preview documentation.
 
-### 6.3 Make Changes
+### 7.3 Make Changes
 
 Edit `.mdx` files in the repository and see changes live in your browser.
 
-## 7. Verify Complete Setup
+## 8. Verify Complete Setup
 
 Test all components:
 
