@@ -6,14 +6,14 @@ description: 'Provision and configure the entire analytics stack for your organi
 As an admin, you'll deploy and manage the complete analytics infrastructure, from core data platforms to AI integrations.
 
 
-### 5. Configure Snowflake MCP Server
+### 1. Configure Snowflake MCP Server
 
 We use the Snowflake-managed MCP server functionality as this requires zero infrastructure management. 
 
 Follow the [Snowflake documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-mcp) to do this, 
 but note the caveats / guidance below. 
 
-**5.1 Create MCP Role and Database**
+**1.1 Create MCP Role and Database**
 
 ```sql
 -- Create MCP role
@@ -35,7 +35,7 @@ GRANT SELECT ON ALL TABLES IN DATABASE FIBER_MAP TO ROLE MCP;
 GRANT SELECT ON FUTURE TABLES IN DATABASE FIBER_MAP TO ROLE MCP;
 ```
 
-**5.2 Create Security Integration (for Claude)**
+**1.2 Create Security Integration (for Claude)**
 Snowflake does not support Dynamic Client Registration. So we need to create a security integration for each client that will connect to the MCP.
 
 ```sql
@@ -55,7 +55,7 @@ CREATE SECURITY INTEGRATION MCPCLAUDE
 **Important**: Use `OAUTH_CLIENT = CUSTOM` (not `GENERIC` as stated in docs). And set the OAUTH_CLIENT_TYPE to Public not Private as in docs.
 </Note>
 
-**5.3 Provision MCP Server**
+**1.3 Provision MCP Server**
 
 ```sql
 CREATE MCP SERVER MCP.PUBLIC.SEARCHLIGHT
@@ -72,7 +72,7 @@ GRANT USAGE ON MCP SERVER MCP.PUBLIC.SEARCHLIGHT TO ROLE MCP;
 GRANT MODIFY ON MCP SERVER MCP.PUBLIC.SEARCHLIGHT TO ROLE MCP;
 ```
 
-**5.4 Retrieve Connection Details**
+**1.4 Retrieve Connection Details**
 
 ```sql
 -- Get Client ID and Client Secret
@@ -86,7 +86,7 @@ SELECT CURRENT_ACCOUNT();
 Store Client ID and Client Secret securely. Use the `zh06779` format for account identifier (not the account locator format).
 </Warning>
 
-**5.5 Distribute to Users**
+**1.5 Distribute to Users**
 
 Provide users with:
 - **Remote URL**: `https://zh06779.north-europe.azure.snowflakecomputing.com/api/v2/databases/MCP/schemas/PUBLIC/mcp-servers/SEARCHLIGHT`
@@ -101,45 +101,45 @@ GRANT ROLE MCP TO USER username;
 
 Then hook up Claude by following the steps from the [Business User setup](/analytics-stack/getting-started/business-user).
 
-### 6. Deploy Prime MCP Server
+### 2. Deploy Prime MCP Server
 
 The Prime MCP server is designed to run in a cloud server. Specifically it is set up to run in [Render](https://render.com/), though it could be deployed to any cloud server. 
 
 Follow the instructions in the [Prime Github Repo](https://github.com/searchlight-capital/prime) to deploy your own instance (and speak to Miles). 
 
 
-### 8. Deploy Mintlify Documentation
+### 3. Deploy Mintlify Documentation
 
-**8.1 Set Up Mintlify**
+**3.1 Set Up Mintlify**
 
 1. Sign up at [Mintlify](https://mintlify.com)
 2. Connect to your `mintlify-docs` GitHub repository
 3. Configure automatic deployments from `main` branch
 
-**8.2 Customize Configuration**
+**3.2 Customize Configuration**
 
 Edit `docs.json` to match your organization:
 - Update site name and colors
 - Configure navigation structure
 - Add your logo files
 
-**8.3 Share Documentation URL**
+**3.3 Share Documentation URL**
 
 Your docs will be available at: `https://your-org.mintlify.app`
 
-### 9. Configure Braintrust
+### 4. Configure Braintrust
 
-**9.1 Create Braintrust Workspace**
+**4.1 Create Braintrust Workspace**
 
 1. Sign up at [Braintrust](https://www.braintrustdata.com/)
 2. Create organization workspace
 3. Invite team members
 
-**9.2 Clone the analytics-evals repo**
+**4.2 Clone the analytics-evals repo**
 This provides a starting point for an evals implementation that works with Claude
 [Analytics-Evals](https://github.com/searchlight-capital/analytics-evals)
 
-**9.3 Create Evaluation Datasets**
+**4.3 Create Evaluation Datasets**
 
 Build test datasets with known good answers, in the Braintrust UI
 
