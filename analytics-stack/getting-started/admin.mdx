@@ -5,199 +5,13 @@ description: 'Provision and configure the entire analytics stack for your organi
 
 As an admin, you'll deploy and manage the complete analytics infrastructure, from core data platforms to AI integrations.
 
-## Overview
-
-This guide covers the complete setup process organized into three phases:
-1. **Core Infrastructure**: Snowflake, GitHub, dbt, Lightdash
-2. **AI & MCP Integration**: Snowflake MCP, Prime, Claude, Cursor
-3. **Documentation & Quality**: Mintlify, Braintrust, automated evaluations
-
-## Phase 1: Core Infrastructure
-
-### 1. Provision Snowflake
-
-**1.1 Create Snowflake Account**
-
-- Set up enterprise Snowflake account (recommended: Azure North Europe region)
-- Configure SSO authentication (recommended for security)
-- Set up billing and usage monitoring
-
-**1.2 Create Organizational Structure**
-
-```sql
--- Create databases
-CREATE DATABASE FIBER_MAP;  -- or your project name
-
--- Create schemas
-CREATE SCHEMA FIBER_MAP.CLEAN;        -- Raw data
-CREATE SCHEMA FIBER_MAP.DBT_STAGE;    -- Staging layer
-CREATE SCHEMA FIBER_MAP.DBT_MODEL;    -- Modeling layer
-CREATE SCHEMA FIBER_MAP.DBT_GOLD;     -- Presentation layer
-
--- Create warehouses
-CREATE WAREHOUSE COMPUTE_WH
-  WAREHOUSE_SIZE = 'MEDIUM'
-  AUTO_SUSPEND = 60
-  AUTO_RESUME = TRUE;
-
-CREATE WAREHOUSE TRANSFORM_WH
-  WAREHOUSE_SIZE = 'LARGE'
-  AUTO_SUSPEND = 60
-  AUTO_RESUME = TRUE;
-```
-
-**1.3 Set Up Roles and Permissions**
-
-```sql
--- Create developer role
-CREATE ROLE DEVELOPER;
-GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE DEVELOPER;
-GRANT ALL ON DATABASE FIBER_MAP TO ROLE DEVELOPER;
-GRANT ALL ON ALL SCHEMAS IN DATABASE FIBER_MAP TO ROLE DEVELOPER;
-
--- Create read-only role for business users
-CREATE ROLE ANALYST;
-GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ANALYST;
-GRANT USAGE ON DATABASE FIBER_MAP TO ROLE ANALYST;
-GRANT SELECT ON ALL TABLES IN SCHEMA FIBER_MAP.DBT_GOLD TO ROLE ANALYST;
-```
-
-**1.4 Grant Roles to Users**
-
-```sql
-GRANT ROLE DEVELOPER TO USER developer_username;
-GRANT ROLE ANALYST TO USER analyst_username;
-```
-
-### 2. Set Up GitHub Organization
-
-**2.1 Create Repositories**
-
-Set up the following repositories in your GitHub organization:
-
-- `fiber_map_dbt` (or your project name): Main dbt project
-- `cursor-rules`: Shared AI coding standards
-- `mintlify-docs`: Documentation site
-- `analytics-evals`: Braintrust evaluation scripts
-- `prime`: Custom MCP server (if self-hosting)
-
-**2.2 Configure Branch Protection**
-
-For each repository:
-1. Go to **Settings** > **Branches**
-2. Add branch protection rule for `main`:
-   - Require pull request reviews
-   - Require status checks to pass
-   - Require branches to be up to date
-
-**2.3 Set Up Teams**
-
-Create GitHub teams:
-- `data-engineers`: Full access to all repos
-- `analysts`: Read access to dbt projects and docs
-- `admins`: Admin access
-
-### 3. Initialize dbt Projects
-
-**3.1 Create dbt Project**
-
-```bash
-dbt init fiber_map
-cd fiber_map
-```
-
-**3.2 Configure dbt_project.yml**
-
-```yaml
-name: 'fiber_map'
-version: '1.0.0'
-
-profile: 'fiber_map'
-
-model-paths: ["models"]
-analysis-paths: ["analyses"]
-test-paths: ["tests"]
-seed-paths: ["seeds"]
-macro-paths: ["macros"]
-snapshot-paths: ["snapshots"]
-
-clean-targets:
-  - "target"
-  - "dbt_packages"
-
-models:
-  fiber_map:
-    +persist_docs:
-      relation: true
-      columns: true
-    STAGE:
-      +schema: DBT_STAGE
-    MODEL:
-      +schema: DBT_MODEL
-    GOLD:
-      +schema: DBT_GOLD
-```
-
-**3.3 Set Up Production Profile**
-
-Create `profiles.yml` for production (store securely):
-
-```yaml
-fiber_map:
-  target: prod
-  outputs:
-    prod:
-      type: snowflake
-      account: zh06779.north-europe.azure
-      user: DBT_SERVICE_ACCOUNT
-      authenticator: snowflake_jwt
-      private_key_path: /path/to/key.p8
-      role: TRANSFORMER
-      warehouse: TRANSFORM_WH
-      database: FIBER_MAP
-      schema: DBT_PROD
-      threads: 8
-```
-
-**3.4 Push to GitHub**
-
-```bash
-git init
-git add .
-git commit -m "Initial dbt project setup"
-git remote add origin https://github.com/your-org/fiber_map_dbt.git
-git push -u origin main
-```
-
-### 4. Deploy Lightdash
-
-**4.1 Choose Deployment Option**
-
-- **Lightdash Cloud**: Easiest, fully managed
-- **Self-Hosted**: More control, requires infrastructure
-
-**4.2 Connect to Snowflake**
-
-In Lightdash settings:
-1. Add Snowflake connection using service account credentials
-2. Specify warehouse: `COMPUTE_WH`
-3. Test connection
-
-**4.3 Connect to dbt Project**
-
-1. Link to your GitHub repository
-2. Specify dbt project path
-3. Run initial sync to import models
-
-**4.4 Configure User Access**
-
-1. Set up SSO (if using Lightdash Cloud)
-2. Create user groups (Developers, Analysts, Viewers)
-3. Assign appropriate permissions
-
-## Phase 2: AI & MCP Integration
 
 ### 5. Configure Snowflake MCP Server
+
+We use the Snowflake-managed MCP server functionality as this requires zero infrastructure management. 
+
+Follow the [Snowflake documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-mcp) to do this, 
+but note the caveats / guidance below. 
 
 **5.1 Create MCP Role and Database**
 
@@ -222,13 +36,14 @@ GRANT SELECT ON FUTURE TABLES IN DATABASE FIBER_MAP TO ROLE MCP;
 ```
 
 **5.2 Create Security Integration (for Claude)**
+Snowflake does not support Dynamic Client Registration. So we need to create a security integration for each client that will connect to the MCP.
 
 ```sql
 CREATE SECURITY INTEGRATION MCPCLAUDE
   TYPE = OAUTH
   ENABLED = TRUE
   OAUTH_CLIENT = CUSTOM
-  OAUTH_CLIENT_TYPE = 'PUBLIC'
+  OAUTH_CLIENT_TYPE = 'PUBLIC' 
   OAUTH_REDIRECT_URI = 'https://claude.ai/api/mcp/auth_callback'
   OAUTH_ISSUE_REFRESH_TOKENS = TRUE
   OAUTH_REFRESH_TOKEN_VALIDITY = 7776000
@@ -237,13 +52,21 @@ CREATE SECURITY INTEGRATION MCPCLAUDE
 ```
 
 <Note>
-**Important**: Use `OAUTH_CLIENT = CUSTOM` (not `GENERIC`). This is a common source of authentication issues.
+**Important**: Use `OAUTH_CLIENT = CUSTOM` (not `GENERIC` as stated in docs). And set the OAUTH_CLIENT_TYPE to Public not Private as in docs.
 </Note>
 
 **5.3 Provision MCP Server**
 
 ```sql
-CREATE MCP SERVER MCP.PUBLIC.SEARCHLIGHT;
+CREATE MCP SERVER MCP.PUBLIC.SEARCHLIGHT
+FROM SPECIFICATION $$
+  tools:
+    - title: "SQL Execution Tool"
+      name: "sql_exec_tool"
+      type: "SYSTEM_EXECUTE_SQL"
+      description: "A tool to execute SQL queries against the connected Snowflake database."
+$$
+;
 
 GRANT USAGE ON MCP SERVER MCP.PUBLIC.SEARCHLIGHT TO ROLE MCP;
 GRANT MODIFY ON MCP SERVER MCP.PUBLIC.SEARCHLIGHT TO ROLE MCP;
@@ -276,63 +99,14 @@ Provide users with:
 GRANT ROLE MCP TO USER username;
 ```
 
+Then hook up Claude by following the steps from the [Business User setup](/analytics-stack/getting-started/business-user).
+
 ### 6. Deploy Prime MCP Server
 
-**6.1 Choose Deployment Platform**
+The Prime MCP server is designed to run in a cloud server. Specifically it is set up to run in [Render](https://render.com/), though it could be deployed to any cloud server. 
 
-Options:
-- **Render**: Easy, cost-effective for small teams
-- **AWS/Azure**: Enterprise-grade, more control
-- **Docker**: Self-hosted on internal infrastructure
+Follow the instructions in the [Prime Github Repo](https://github.com/searchlight-capital/prime) to deploy your own instance (and speak to Miles). 
 
-**6.2 Deploy Prime Application**
-
-**For Render:**
-1. Fork/clone the [Prime repository](https://github.com/searchlight-capital/prime)
-2. Create new Web Service in Render
-3. Connect to your GitHub repository
-4. Set build command: `npm install`
-5. Set start command: `npm start`
-
-**Environment Variables:**
-```
-DBT_MANIFEST_PATH=/path/to/manifest.json
-PORT=3000
-```
-
-**6.3 Configure Manifest Sync**
-
-Set up automated sync to keep Prime updated with latest dbt changes:
-
-```bash
-# In your dbt production workflow
-dbt docs generate
-curl -X POST https://your-prime-url.onrender.com/refresh \
-  -H "Content-Type: application/json" \
-  -d @target/manifest.json
-```
-
-**6.4 Distribute Prime URL**
-
-Share the Prime URL with users (e.g., `http://prime-f15k.onrender.com/`)
-
-### 7. Provision Claude & Cursor Licenses
-
-**7.1 Claude Enterprise (Optional)**
-
-Consider [Claude for Enterprise](https://www.anthropic.com/enterprise) for:
-- Centralized billing
-- Enhanced security controls
-- Larger context windows
-- Priority support
-
-**7.2 Cursor Licenses**
-
-1. Visit [Cursor Pricing](https://cursor.sh/pricing)
-2. Purchase Pro or Business licenses for your team
-3. Distribute license keys to developers
-
-## Phase 3: Documentation & Quality
 
 ### 8. Deploy Mintlify Documentation
 
@@ -361,147 +135,12 @@ Your docs will be available at: `https://your-org.mintlify.app`
 2. Create organization workspace
 3. Invite team members
 
-**9.2 Set Up Projects**
-
-Create projects for different evaluation types:
-- `dbt-generation`: Test AI-generated dbt code
-- `sql-accuracy`: Test SQL query generation
-- `metric-understanding`: Test semantic layer comprehension
+**9.2 Clone the analytics-evals repo**
+This provides a starting point for an evals implementation that works with Claude
+[Analytics-Evals](https://github.com/searchlight-capital/analytics-evals)
 
 **9.3 Create Evaluation Datasets**
 
-Build test datasets with known good answers:
+Build test datasets with known good answers, in the Braintrust UI
 
-```python
-# Example evaluation script
-import braintrust
-
-project = braintrust.init(project="sql-accuracy")
-
-project.log(
-    input="Show me total revenue by customer",
-    expected="SELECT customer_id, SUM(revenue) FROM orders GROUP BY customer_id",
-    # ... add test cases
-)
-```
-
-### 10. Schedule Automated Evaluations
-
-**10.1 Create GitHub Actions Workflow**
-
-Create `.github/workflows/run-evals.yml`:
-
-```yaml
-name: Run Braintrust Evaluations
-
-on:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight
-  workflow_dispatch:  # Manual trigger
-
-jobs:
-  evaluate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      
-      - name: Install dependencies
-        run: |
-          cd analytics-evals
-          pip install -r requirements.txt
-      
-      - name: Run evaluations
-        env:
-          BRAINTRUST_API_KEY: ${{ secrets.BRAINTRUST_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          cd analytics-evals
-          python run_all_evals.py
-```
-
-**10.2 Add Secrets**
-
-In GitHub repository settings, add:
-- `BRAINTRUST_API_KEY`
-- `ANTHROPIC_API_KEY`
-
-**10.3 Monitor Results**
-
-Check Braintrust dashboard for evaluation results and trends over time.
-
-### 11. Final Distribution & Training
-
-**11.1 Create User Documentation**
-
-Document for your organization:
-- Connection details (Snowflake account, URLs)
-- Access request process
-- Internal support contacts
-- Common troubleshooting steps
-
-**11.2 Conduct Training Sessions**
-
-- **Business Users**: How to use Claude + Lightdash
-- **Developers**: dbt workflows, Cursor features, best practices
-- **Everyone**: Data security, acceptable use policies
-
-**11.3 Set Up Support Channels**
-
-- Create Slack/Teams channel for questions
-- Designate admin on-call rotation
-- Document escalation procedures
-
-## Maintenance & Operations
-
-**Weekly:**
-- Review Snowflake usage and costs
-- Check Braintrust evaluation results
-- Monitor failed dbt runs
-
-**Monthly:**
-- Review user access and permissions
-- Update dbt packages and dependencies
-- Review and archive old development schemas
-
-**Quarterly:**
-- Review and optimize warehouse sizes
-- Audit security integrations
-- Plan capacity for growth
-
-## Need Help?
-
-<CardGroup cols={2}>
-  <Card
-    title="Snowflake MCP Docs"
-    icon="snowflake"
-    href="https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-mcp"
-  >
-    Official Snowflake documentation
-  </Card>
-  <Card
-    title="dbt Documentation"
-    icon="book"
-    href="https://docs.getdbt.com/"
-  >
-    dbt Core setup and configuration
-  </Card>
-  <Card
-    title="Lightdash Docs"
-    icon="lightbulb"
-    href="https://docs.lightdash.com/"
-  >
-    Lightdash deployment guides
-  </Card>
-  <Card
-    title="Contact Support"
-    icon="life-ring"
-    href="mailto:data-team@searchlightcapital.com"
-  >
-    Reach out to the data team
-  </Card>
-</CardGroup>
+See [docs](https://www.braintrust.dev/docs/core/datasets)
